@@ -153,3 +153,18 @@
 - Prometheus /metrics 监控
 - Docker Compose 一键部署（含 dufs + nginx）
 - WeChat 风格多端 UI（#07C160 绿色主色调）
+
+## v0.4.0-sprint3 - 2026-05-26
+
+### 变更内容
+- Push Token 管理：im_push_token 表 + POST /api/push/token
+- 离线推送：PushVerticle 检测离线调用 APNs/FCM
+- APNs/FCM 集成（占位，需配置激活）
+- 推送频率限制（PushRateLimiter）
+- E2EE 密钥交换：im_user_key 表 + API
+- ServerConfig 新增 APNs/FCM 环境变量配置
+
+### 功能列表
+- 离线推送（APNs/FCM）
+- 推送频率限制
+- E2EE 公钥存储与交换

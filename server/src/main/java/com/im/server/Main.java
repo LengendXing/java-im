@@ -3,6 +3,9 @@ package com.im.server;
 import com.im.server.common.*;
 import com.im.server.mq.FolkmqService;
 import com.im.server.mq.FolkmqServiceHolder;
+import com.im.server.push.ApnsService;
+import com.im.server.push.FcmService;
+import com.im.server.push.PushServiceHolder;
 import com.im.server.storage.DatabaseService;
 import com.im.server.storage.RedisService;
 import io.vertx.core.DeploymentOptions;
@@ -88,6 +91,11 @@ public class Main {
                     } catch (java.io.IOException e) {
                         log.warn("Folkmq connection failed, falling back to EventBus: {}", e.getMessage());
                     }
+                    PushServiceHolder.init(
+                        new ApnsService(serverConfig.isApnsEnabled(), serverConfig.getApnsBundleId(), serverConfig.getApnsP8Path(), serverConfig.getApnsTeamId(), serverConfig.getApnsKeyId()),
+                        new FcmService(serverConfig.isFcmEnabled(), serverConfig.getFcmCredentialsPath())
+                    );
+                    log.info("Push services initialized (APNs={}, FCM={})", serverConfig.isApnsEnabled(), serverConfig.isFcmEnabled());
                     return io.vertx.core.Future.succeededFuture();
                 })
                 .compose(v -> {

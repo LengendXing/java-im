@@ -83,4 +83,11 @@ public class ServerConfig {
     public String getFolkmqHost() { return folkmq.getString("host", "127.0.0.1"); }
     public int getFolkmqPort() { return folkmq.getInteger("port", 18602); }
     public String getFolkmqAppName() { return folkmq.getString("appName", "im-server"); }
+    public boolean isApnsEnabled() { return Boolean.parseBoolean(System.getProperty("IM_APNS_ENABLED", "false")); }
+    public String getApnsBundleId() { return System.getProperty("IM_APNS_BUNDLE_ID", ""); }
+    public String getApnsP8Path() { return System.getProperty("IM_APNS_P8_PATH", ""); }
+    public String getApnsTeamId() { return System.getProperty("IM_APNS_TEAM_ID", ""); }
+    public String getApnsKeyId() { return System.getProperty("IM_APNS_KEY_ID", ""); }
+    public boolean isFcmEnabled() { return Boolean.parseBoolean(System.getProperty("IM_FCM_ENABLED", "false")); }
+    public String getFcmCredentialsPath() { return System.getProperty("IM_FCM_CREDENTIALS_PATH", ""); }
 }

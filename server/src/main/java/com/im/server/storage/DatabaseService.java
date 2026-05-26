@@ -444,6 +444,27 @@ public class DatabaseService {
             ALTER TABLE im_message ADD COLUMN IF NOT EXISTS is_recalled TINYINT DEFAULT 0;
             ALTER TABLE im_group ADD COLUMN IF NOT EXISTS max_members INT DEFAULT 5000;
             ALTER TABLE im_group ADD COLUMN IF NOT EXISTS diffusion_mode TINYINT DEFAULT 0;
+            CREATE TABLE IF NOT EXISTS im_push_token (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                platform TINYINT NOT NULL,
+                token VARCHAR(256) NOT NULL,
+                bundle_id VARCHAR(128) DEFAULT '',
+                updated_at BIGINT DEFAULT 0,
+                UNIQUE KEY uk_user_platform (user_id, platform),
+                INDEX idx_token (token(64))
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            CREATE TABLE IF NOT EXISTS im_user_key (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                key_type TINYINT NOT NULL,
+                key_id INT NOT NULL,
+                public_key BLOB NOT NULL,
+                signature BLOB,
+                used TINYINT DEFAULT 0,
+                created_at BIGINT DEFAULT 0,
+                UNIQUE KEY uk_user_key_type_id (user_id, key_type, key_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """;
         pool.query(sql).execute()
                 .compose(v -> {
@@ -622,5 +643,26 @@ public class DatabaseService {
 
     public MySQLPool getPool() {
         return pool;
+    }
+
+    public Future<Void> upsertPushToken(long userId, int platform, String token, String bundleId) {
+        Promise<Void> promise = Promise.promise();
+        pool.preparedQuery("INSERT INTO im_push_token (user_id, platform, token, bundle_id, updated_at) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE token = ?, bundle_id = ?, updated_at = ?")
+                .execute(Tuple.of(userId, platform, token, bundleId, System.currentTimeMillis(), token, bundleId, System.currentTimeMillis()))
+                .onSuccess(v -> promise.complete())
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    public Future<String> getPushToken(long userId, int platform) {
+        Promise<String> promise = Promise.promise();
+        pool.preparedQuery("SELECT token FROM im_push_token WHERE user_id = ? AND platform = ?")
+                .execute(Tuple.of(userId, platform))
+                .onSuccess(rows -> {
+                    if (rows.iterator().hasNext()) promise.complete(rows.iterator().next().getString(0));
+                    else promise.complete(null);
+                })
+                .onFailure(promise::fail);
+        return promise.future();
     }
 }

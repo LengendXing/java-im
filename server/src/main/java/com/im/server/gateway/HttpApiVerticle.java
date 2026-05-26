@@ -2,6 +2,8 @@ package com.im.server.gateway;
 
 import com.im.server.common.RedisServiceHolder;
 import com.im.server.common.ServerConfig;
+import com.im.server.e2ee.E2eeKeyServiceHolder;
+import com.im.server.common.DatabaseServiceHolder;
 import com.im.server.storage.RedisService;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.http.HttpMethod;
@@ -263,6 +265,53 @@ public class HttpApiVerticle extends AbstractVerticle {
                     new JsonObject().put("userId", userId).put("keyword", keyword)
                             .put("sessionId", sessionId).put("limit", limit),
                     reply -> handleReply(ctx, reply));
+        });
+
+        // Push token registration
+        router.post("/api/push/token").handler(ctx -> {
+            long userId = ctx.get("userId");
+            JsonObject body = ctx.body().asJsonObject();
+            int platform = body.getInteger("platform", 0);
+            String token = body.getString("token", "");
+            String bundleId = body.getString("bundleId", "");
+            if (platform <= 0 || token.isEmpty()) {
+                ctx.json(new JsonObject().put("code", 1003).put("msg", "invalid params"));
+                return;
+            }
+            DatabaseServiceHolder.getInstance().upsertPushToken(userId, platform, token, bundleId)
+                    .onSuccess(v -> ctx.json(new JsonObject().put("code", 0).put("msg", "ok")))
+                    .onFailure(e -> ctx.json(new JsonObject().put("code", 1).put("msg", e.getMessage())));
+        });
+
+        // E2EE key bundle upload
+        router.post("/api/e2ee/keys").handler(ctx -> {
+            long userId = ctx.get("userId");
+            JsonObject body = ctx.body().asJsonObject();
+            int keyType = body.getInteger("keyType", 0);
+            int keyId = body.getInteger("keyId", 0);
+            String publicKeyB64 = body.getString("publicKey", "");
+            String signatureB64 = body.getString("signature", "");
+            if (keyType <= 0 || keyId < 0 || publicKeyB64.isEmpty()) {
+                ctx.json(new JsonObject().put("code", 1003).put("msg", "invalid params"));
+                return;
+            }
+            byte[] publicKey = java.util.Base64.getDecoder().decode(publicKeyB64);
+            byte[] signature = signatureB64.isEmpty() ? new byte[0] : java.util.Base64.getDecoder().decode(signatureB64);
+            E2eeKeyServiceHolder.getInstance().storePublicKey(userId, keyType, keyId, publicKey, signature)
+                    .onSuccess(v -> ctx.json(new JsonObject().put("code", 0).put("msg", "ok")))
+                    .onFailure(e -> ctx.json(new JsonObject().put("code", 1).put("msg", e.getMessage())));
+        });
+
+        // E2EE key bundle fetch
+        router.get("/api/e2ee/keys/:userId").handler(ctx -> {
+            long targetUserId = Long.parseLong(ctx.pathParam("userId"));
+            E2eeKeyServiceHolder.getInstance().getKeyBundle(targetUserId)
+                    .onSuccess(keys -> {
+                        JsonArray arr = new JsonArray();
+                        for (byte[] k : keys) arr.add(java.util.Base64.getEncoder().encodeToString(k));
+                        ctx.json(new JsonObject().put("code", 0).put("msg", "ok").put("keys", arr));
+                    })
+                    .onFailure(e -> ctx.json(new JsonObject().put("code", 1).put("msg", e.getMessage())));
         });
 
         vertx.createHttpServer()

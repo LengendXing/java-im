@@ -2,8 +2,16 @@ package com.im.server.logic;
 
 import com.im.server.common.Cmd;
 import com.im.server.common.RedisServiceHolder;
+import com.im.server.e2ee.E2eeKeyServiceHolder;
+import com.im.server.e2ee.E2eeKeyService;
 import com.im.server.mq.FolkmqServiceHolder;
 import com.im.server.mq.FolkmqService;
+import com.im.server.push.ApnsService;
+import com.im.server.push.FcmService;
+import com.im.server.push.PushServiceHolder;
+import com.im.server.push.PushRateLimiter;
+import com.im.server.common.DatabaseServiceHolder;
+import com.im.server.storage.DatabaseService;
 import com.im.server.storage.RedisService;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.buffer.Buffer;
@@ -72,7 +80,8 @@ public class PushVerticle extends AbstractVerticle {
 
                             log.debug("push to userId={}, cmd=0x{}, gateway={}", userId, Integer.toHexString(cmd), gatewayId);
                         } else {
-                            log.debug("user {} offline, skip push for cmd=0x{}", userId, Integer.toHexString(cmd));
+                            log.debug("user {} offline, sending push notification", userId);
+                            sendOfflinePush(userId, cmd, payload);
                         }
                     })
                     .onFailure(err -> {
@@ -85,6 +94,30 @@ public class PushVerticle extends AbstractVerticle {
 
         } catch (Exception e) {
             log.error("push error: {}", e.getMessage());
+        }
+    }
+
+    private void sendOfflinePush(long userId, int cmd, byte[] payload) {
+        PushRateLimiter limiter = PushServiceHolder.getRateLimiter();
+        if (limiter != null && !limiter.shouldPush(userId)) return;
+
+        DatabaseService db = DatabaseServiceHolder.getInstance();
+        ApnsService apns = PushServiceHolder.getApnsService();
+        FcmService fcm = PushServiceHolder.getFcmService();
+
+        String title = "新消息";
+        String body = "你有一条新消息";
+
+        // Try iOS (platform=1) then Android (platform=2)
+        if (apns != null && apns.isEnabled()) {
+            db.getPushToken(userId, 1).onSuccess(token -> {
+                if (token != null) apns.push(token, title, body, 1);
+            });
+        }
+        if (fcm != null && fcm.isEnabled()) {
+            db.getPushToken(userId, 2).onSuccess(token -> {
+                if (token != null) fcm.push(token, title, body);
+            });
         }
     }
 }
