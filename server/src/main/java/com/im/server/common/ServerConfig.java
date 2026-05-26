@@ -8,6 +8,8 @@ public class ServerConfig {
     private int httpPort;
     private JsonObject redis;
     private JsonObject mysql;
+    private JsonObject cluster;
+    private JsonObject folkmq;
     private String jwtSecret;
     private int jwtTtlDays;
     private long workerId;
@@ -33,6 +35,13 @@ public class ServerConfig {
                 .put("database", System.getProperty("IM_MYSQL_DB", "im_db"))
                 .put("user", System.getProperty("IM_MYSQL_USER", "root"))
                 .put("password", System.getProperty("IM_MYSQL_PASSWORD", "root")));
+        cfg.cluster = json.getJsonObject("cluster", new JsonObject()
+                .put("enabled", Boolean.parseBoolean(System.getProperty("IM_CLUSTER_ENABLED", "true")))
+                .put("hazelcastConfig", json.getJsonObject("cluster", new JsonObject()).getString("hazelcastConfig", "hazelcast.xml")));
+        cfg.folkmq = json.getJsonObject("folkmq", new JsonObject()
+                .put("host", System.getProperty("IM_FOLKMQ_HOST", "127.0.0.1"))
+                .put("port", Integer.parseInt(System.getProperty("IM_FOLKMQ_PORT", "18602")))
+                .put("appName", System.getProperty("IM_FOLKMQ_APP_NAME", "im-server")));
         cfg.jwtSecret = System.getProperty("IM_JWT_SECRET",
                 json.getString("jwtSecret", "change-me-in-production"));
         cfg.jwtTtlDays = json.getInteger("jwtTtlDays", 7);
@@ -46,6 +55,7 @@ public class ServerConfig {
         return new JsonObject()
                 .put("tcpPort", tcpPort).put("wsPort", wsPort).put("httpPort", httpPort)
                 .put("redis", redis).put("mysql", mysql)
+                .put("cluster", cluster).put("folkmq", folkmq)
                 .put("jwtSecret", jwtSecret).put("jwtTtlDays", jwtTtlDays)
                 .put("workerId", workerId)
                 .put("heartbeatInterval", heartbeatInterval).put("heartbeatTimeout", heartbeatTimeout);
@@ -68,4 +78,9 @@ public class ServerConfig {
     public long getWorkerId() { return workerId; }
     public long getHeartbeatInterval() { return heartbeatInterval; }
     public long getHeartbeatTimeout() { return heartbeatTimeout; }
+    public boolean isClusterEnabled() { return cluster.getBoolean("enabled", true); }
+    public String getHazelcastConfig() { return cluster.getString("hazelcastConfig", "hazelcast.xml"); }
+    public String getFolkmqHost() { return folkmq.getString("host", "127.0.0.1"); }
+    public int getFolkmqPort() { return folkmq.getInteger("port", 18602); }
+    public String getFolkmqAppName() { return folkmq.getString("appName", "im-server"); }
 }

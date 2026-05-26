@@ -5,6 +5,8 @@ dependencies {
     implementation("io.vertx:vertx-redis-client:4.5.4")
     implementation("io.vertx:vertx-mysql-client:4.5.4")
     implementation("io.vertx:vertx-config:4.5.4")
+    implementation("io.vertx:vertx-hazelcast:4.5.4")
+    implementation("org.noear:folkmq-transport-netty:1.7.13")
     implementation("com.google.protobuf:protobuf-java:3.25.3")
     implementation("io.jsonwebtoken:jjwt-api:0.12.5")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")

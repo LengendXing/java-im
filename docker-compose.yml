@@ -43,6 +43,20 @@ services:
       interval: 5s
       retries: 5
 
+  folkmq:
+    image: noearorg/folkmq-broker:1.7.13
+    ports:
+      - "18602:18602"
+      - "8602:8602"
+    environment:
+      FOLKMQ_BROKER_DEFAULT: "folkmq:18602"
+    volumes:
+      - folkmq_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8602/"]
+      interval: 5s
+      retries: 5
+
   im-server:
     build:
       context: .
@@ -60,6 +74,8 @@ services:
       IM_MYSQL_USER: im_user
       IM_MYSQL_PASSWORD: im_pass_2024
       IM_JWT_SECRET: change-me-in-production-env
+      IM_FOLKMQ_HOST: folkmq
+      IM_FOLKMQ_PORT: 18602
       DUFS_URL: http://dufs:5100
       dufs.upload.dir: /app/uploads
     volumes:
@@ -70,6 +86,8 @@ services:
       mysql:
         condition: service_healthy
       dufs:
+        condition: service_healthy
+      folkmq:
         condition: service_healthy
     restart: on-failure
 
@@ -87,3 +105,4 @@ volumes:
   redis_data:
   mysql_data:
   uploads_data:
+  folkmq_data:

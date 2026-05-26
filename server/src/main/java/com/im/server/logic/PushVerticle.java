@@ -2,6 +2,8 @@ package com.im.server.logic;
 
 import com.im.server.common.Cmd;
 import com.im.server.common.RedisServiceHolder;
+import com.im.server.mq.FolkmqServiceHolder;
+import com.im.server.mq.FolkmqService;
 import com.im.server.storage.RedisService;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.buffer.Buffer;
@@ -19,10 +21,23 @@ public class PushVerticle extends AbstractVerticle {
     public void start() {
         redisService = RedisServiceHolder.getInstance();
 
+        // Subscribe to Folkmq topics for persistent message delivery
+        FolkmqService folkmq = FolkmqServiceHolder.getInstance();
+        if (folkmq != null) {
+            folkmq.subscribe("im-c2c", this::handleFolkmqMessage);
+            folkmq.subscribe("im-group", this::handleFolkmqMessage);
+            log.info("PushVerticle subscribed to Folkmq topics im-c2c, im-group");
+        }
+
+        // Keep EventBus consumer for backward compatibility and non-Folkmq pushes
         vertx.eventBus().consumer("im.logic.PUSH", msg -> {
             byte[] data = (byte[]) msg.body();
             handlePush(data);
         });
+    }
+
+    private void handleFolkmqMessage(byte[] data) {
+        handlePush(data);
     }
 
     private void handlePush(byte[] data) {
@@ -45,7 +60,6 @@ public class PushVerticle extends AbstractVerticle {
 
             byte[] packetBytes = buf.array();
 
-            // Look up user route via Redis to find correct gateway
             redisService.getRoute(userId)
                     .onSuccess(gatewayId -> {
                         if (gatewayId != null) {
@@ -53,7 +67,6 @@ public class PushVerticle extends AbstractVerticle {
                             pushBuf.appendLong(userId);
                             pushBuf.appendBytes(packetBytes);
 
-                            // Route to the specific gateway instance
                             String address = "im.gateway." + gatewayId;
                             vertx.eventBus().send(address, pushBuf.getBytes());
 
@@ -64,7 +77,6 @@ public class PushVerticle extends AbstractVerticle {
                     })
                     .onFailure(err -> {
                         log.warn("route lookup failed for userId={}: {}", userId, err.getMessage());
-                        // Fallback: broadcast to local gateway
                         Buffer pushBuf = Buffer.buffer();
                         pushBuf.appendLong(userId);
                         pushBuf.appendBytes(packetBytes);

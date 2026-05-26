@@ -2,6 +2,15 @@
   "tcpPort": 8800,
   "wsPort": 8801,
   "httpPort": 8080,
+  "cluster": {
+    "enabled": true,
+    "hazelcastConfig": "hazelcast.xml"
+  },
+  "folkmq": {
+    "host": "127.0.0.1",
+    "port": 18602,
+    "appName": "im-server"
+  },
   "redis": {
     "host": "127.0.0.1",
     "port": 6379,

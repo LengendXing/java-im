@@ -83,7 +83,25 @@
 - Docker Compose 一键部署（含 dufs）
 - WeChat 风格多端 UI（#07C160 绿色主色调）
 
-## v0.3.0 - 2026-05-26
+## v0.4.0-sprint1 - 2026-05-26
+
+### 变更内容
+- Vert.x Cluster 集群化：引入 vertx-hazelcast ClusterManager，支持多实例 EventBus 跨节点通信
+- Gateway 无状态化：GatewayVerticle stop() 时 drain 连接 + 注销路由
+- Logic Verticle 多实例：Auth/C2C/Group/Session/Push 全部支持多实例部署（默认 x2）
+- Folkmq 消息中间件集成：C2C/Group 消息通过 Folkmq 持久化投递，PushVerticle 订阅 Folkmq topic
+- 消息有序性：单聊按 session_id 作 sharding key，Folkmq sequence 保证同会话消息有序
+- 优雅上下线：SIGTERM 信号触发 Vertx.close() + Folkmq.disconnect()
+- hazelcast.xml 集群配置：支持 multicast / 静态 IP / K8s DNS 发现
+- Docker Compose 新增 folkmq 服务（noearorg/folkmq-broker:1.7.13）
+- ServerConfig 新增 cluster / folkmq 配置项
+- Folkmq 连接失败自动降级到 EventBus 直接投递
+
+### 功能列表
+- Vert.x Cluster 集群部署（Hazelcast 多节点 EventBus 通信）
+- Gateway 无状态化 + 优雅上下线
+- Folkmq 持久化消息投递（im-c2c / im-group topic）
+- 消息有序性（session_id sharding key） - 2026-05-26
 
 ### 变更内容
 - Docker Compose 部署方案完善：dufs 替代 MinIO、server/web Dockerfile 多阶段构建、nginx 反向代理、healthcheck

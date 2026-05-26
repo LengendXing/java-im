@@ -36,4 +36,8 @@ public class ConnectionManager {
     public int connectionCount() {
         return byConnId.size();
     }
+
+    public java.util.Collection<Connection> getAllConnections() {
+        return byConnId.values();
+    }
 }

@@ -2,6 +2,8 @@ package com.im.server.logic;
 
 import com.im.protocol.ImProto;
 import com.im.server.common.*;
+import com.im.server.mq.FolkmqServiceHolder;
+import com.im.server.mq.FolkmqService;
 import com.im.server.storage.DatabaseService;
 import com.im.server.storage.Message;
 import com.im.server.storage.RedisService;
@@ -131,7 +133,7 @@ public class GroupVerticle extends AbstractVerticle {
                             dbService.upsertSession(memberId, result.sessionId, 2, result.groupId, "",
                                     lastMsg, result.serverTime);
 
-                            // Push notify
+                            // Push notify via Folkmq
                             ImProto.GroupMsgNotify notify = ImProto.GroupMsgNotify.newBuilder()
                                     .setMsgId(result.msgId).setSenderId(result.senderId)
                                     .setGroupId(result.groupId).setSessionId(result.sessionId)
@@ -139,8 +141,14 @@ public class GroupVerticle extends AbstractVerticle {
                                     .addAllAtUserIds(result.atUserIds)
                                     .setServerTime(result.serverTime)
                                     .build();
-                            vertx.eventBus().send("im.logic.PUSH",
-                                    PushEnvelope.create(memberId, Cmd.GROUP_MSG_NOTIFY, notify.toByteArray()));
+                            byte[] pushData = PushEnvelope.create(memberId, Cmd.GROUP_MSG_NOTIFY, notify.toByteArray());
+
+                            FolkmqService folkmq = FolkmqServiceHolder.getInstance();
+                            if (folkmq != null) {
+                                folkmq.publishOrdered("im-group", pushData, result.sessionId);
+                            } else {
+                                vertx.eventBus().send("im.logic.PUSH", pushData);
+                            }
 
                             // INCR unread for all non-sender members
                             redisService.incrUnread(memberId, result.sessionId);

@@ -1,0 +1,39 @@
+<hazelcast xmlns="http://www.hazelcast.com/schema/config"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://www.hazelcast.com/schema/config
+           http://www.hazelcast.com/schema/config/hazelcast-config-5.0.xsd">
+
+    <cluster-name>java-im-cluster</cluster-name>
+
+    <network>
+        <port auto-increment="true" port-count="100">5701</port>
+        <join>
+            <!-- Multicast discovery (default, for local dev) -->
+            <multicast enabled="true">
+                <multicast-group>224.2.2.3</multicast-group>
+                <multicast-port>54327</multicast-port>
+            </multicast>
+
+            <!-- Static IP list (uncomment for production) -->
+            <!--
+            <tcp-ip enabled="true">
+                <member>im-server-1:5701</member>
+                <member>im-server-2:5701</member>
+            </tcp-ip>
+            -->
+
+            <!-- Kubernetes DNS discovery (uncomment for K8s) -->
+            <!--
+            <dns enabled="true">
+                <service>im-server-headless.default.svc.cluster.local</service>
+            </dns>
+            -->
+        </join>
+    </network>
+
+    <properties>
+        <property name="hazelcast.logging.type">slf4j</property>
+        <property name="hazelcast.operation.call.timeout.millis">120000</property>
+    </properties>
+
+</hazelcast>

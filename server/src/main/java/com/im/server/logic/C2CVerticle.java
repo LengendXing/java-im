@@ -2,6 +2,8 @@ package com.im.server.logic;
 
 import com.im.protocol.ImProto;
 import com.im.server.common.*;
+import com.im.server.mq.FolkmqServiceHolder;
+import com.im.server.mq.FolkmqService;
 import com.im.server.storage.DatabaseService;
 import com.im.server.storage.Message;
 import com.im.server.storage.RedisService;
@@ -90,14 +92,20 @@ public class C2CVerticle extends AbstractVerticle {
                                 .build();
                         msg.reply(ack.toByteArray());
 
-                        // 8. Push to receiver via PushVerticle
+                        // 8. Push to receiver via Folkmq (persistent, ordered by session)
                         ImProto.C2CMsgNotify notify = ImProto.C2CMsgNotify.newBuilder()
                                 .setMsgId(result.msgId).setSenderId(result.senderId)
                                 .setSessionId(result.sessionId).setSeq(result.seq)
                                 .setContent(result.content).setServerTime(result.serverTime)
                                 .build();
-                        vertx.eventBus().send("im.logic.PUSH",
-                                PushEnvelope.create(result.receiverId, Cmd.C2C_MSG_NOTIFY, notify.toByteArray()));
+                        byte[] pushData = PushEnvelope.create(result.receiverId, Cmd.C2C_MSG_NOTIFY, notify.toByteArray());
+
+                        FolkmqService folkmq = FolkmqServiceHolder.getInstance();
+                        if (folkmq != null) {
+                            folkmq.publishOrdered("im-c2c", pushData, result.sessionId);
+                        } else {
+                            vertx.eventBus().send("im.logic.PUSH", pushData);
+                        }
 
                         log.info("C2C msg: {} -> {}, seq={}", result.senderId, result.receiverId, result.seq);
                     })

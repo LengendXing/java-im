@@ -25,6 +25,22 @@ public class GatewayVerticle extends AbstractVerticle {
     private String gatewayId;
 
     @Override
+    public void stop() {
+        log.info("GatewayVerticle stopping, draining connections for gatewayId={}", gatewayId);
+
+        // Unregister all online users from Redis route table
+        for (Connection conn : connManager.getAllConnections()) {
+            if (conn.isAuthenticated()) {
+                RedisServiceHolder.getInstance().setUserOffline(conn.getUserId())
+                        .onFailure(err -> log.warn("route remove failed for user {}: {}", conn.getUserId(), err.getMessage()));
+                conn.close();
+            }
+        }
+
+        log.info("GatewayVerticle {} stopped, all connections drained", gatewayId);
+    }
+
+    @Override
     public void start() {
         JsonObject cfg = config();
         serverConfig = ServerConfig.fromJson(cfg);

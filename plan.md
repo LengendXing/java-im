@@ -38,9 +38,9 @@
 - [x] 环境变量配置（Docker 友好） ✅ 2026-05-26
 - [x] Prometheus /metrics 端点 ✅ 2026-05-26
 - [x] Healthcheck（Docker 服务健康检查） ✅ 2026-05-26
-- [ ] Vert.x Cluster 集群部署（Hazelcast/Zookeeper）
-- [ ] Kafka 消息中间件集成（推送削峰）
-- [ ] Nacos 服务注册发现
+- [x] Vert.x Cluster 集群部署（Hazelcast） ✅ 2026-05-26
+- [x] Folkmq 消息中间件集成（持久化投递） ✅ 2026-05-26
+- [ ] RNacos 服务注册发现
 - [ ] Grafana 监控面板
 - [ ] ELK 日志聚合
 - [ ] 压力测试（JMeter）
