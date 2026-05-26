@@ -197,3 +197,17 @@
 ### 功能列表
 - RNacos 服务注册发现（默认关闭，环境变量激活）
 - 管理控制台端口10848
+
+## v0.4.0-subitems - 2026-05-26
+
+### 变更内容
+- A4: GatewayVerticle.stop() 从 Nacos 注销服务实例
+- B6: 推送死信告警 — PushVerticle 检测推送失败（限流/无token/SDK错误），通过飞书 Webhook 发送橙色告警卡片
+- D5: 动态扩散模式切换 — 群成员数跨越200阈值时自动切换读写扩散模式并清除成员缓存
+- 群成员变更时（invite/kick）自动失效 Redis 缓存
+- 新增 IM_FEISHU_WEBHOOK 环境变量
+
+### 功能列表
+- Gateway 优雅下线 Nacos 注销
+- 推送死信飞书告警
+- 动态扩散模式双向切换 + 缓存一致性
