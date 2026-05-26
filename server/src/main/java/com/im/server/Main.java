@@ -6,6 +6,8 @@ import com.im.server.mq.FolkmqServiceHolder;
 import com.im.server.push.ApnsService;
 import com.im.server.push.FcmService;
 import com.im.server.push.PushServiceHolder;
+import com.im.server.registry.NacosRegistryService;
+import com.im.server.registry.NacosRegistryHolder;
 import com.im.server.storage.DatabaseService;
 import com.im.server.storage.RedisService;
 import io.vertx.core.DeploymentOptions;
@@ -96,6 +98,14 @@ public class Main {
                         new FcmService(serverConfig.isFcmEnabled(), serverConfig.getFcmCredentialsPath())
                     );
                     log.info("Push services initialized (APNs={}, FCM={})", serverConfig.isApnsEnabled(), serverConfig.isFcmEnabled());
+
+                    NacosRegistryService nacos = new NacosRegistryService();
+                    try { nacos.init(serverConfig.getNacosServerAddr(), serverConfig.isNacosEnabled()); } catch (Exception e) { log.warn("Nacos init failed: {}", e.getMessage()); }
+                    NacosRegistryHolder.setInstance(nacos);
+                    if (nacos.isEnabled()) {
+                        nacos.register("0.0.0.0", serverConfig.getHttpPort(), "im");
+                    }
+
                     return io.vertx.core.Future.succeededFuture();
                 })
                 .compose(v -> {
@@ -141,8 +151,12 @@ public class Main {
         log.info("Graceful shutdown initiated (SIGTERM)");
 
         FolkmqService folkmq = FolkmqServiceHolder.getInstance();
-        if (folkmq != null) {
-            folkmq.close();
+        if (folkmq != null) folkmq.close();
+
+        NacosRegistryService nacos = NacosRegistryHolder.getInstance();
+        if (nacos != null && nacos.isEnabled()) {
+            nacos.deregister("0.0.0.0", 8080, "im");
+            nacos.close();
         }
 
         if (vertx != null) {

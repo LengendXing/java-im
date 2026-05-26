@@ -108,3 +108,18 @@ volumes:
   prometheus_data:
   grafana_data:
   loki_data:
+  rnacos_data:
+
+  # === Service Registry ===
+
+  rnacos:
+    image: qingpan/rnacos:stable
+    ports:
+      - "8848:8848"
+      - "10848:10848"
+    environment:
+      RNACOS_RUN_MODE: standalone
+      RNACOS_CONFIG_DB_DIR: /data/nacos_db
+    volumes:
+      - rnacos_data:/data
+    restart: on-failure

@@ -184,3 +184,16 @@
 - Loki 日志聚合
 - 告警规则
 - JMeter 压测脚本
+
+## v0.4.0-sprint5 - 2026-05-26
+
+### 变更内容
+- RNacos 单机部署（Docker Compose，端口8848/10848）
+- NacosRegistryService：服务注册/发现/注销（nacos-client 2.3.2）
+- 启动时注册 im-server 实例，关闭时注销
+- ServerConfig 新增 IM_NACOS_ENABLED / IM_NACOS_SERVER_ADDR 环境变量
+- Docker Compose 新增 rnacos 服务
+
+### 功能列表
+- RNacos 服务注册发现（默认关闭，环境变量激活）
+- 管理控制台端口10848

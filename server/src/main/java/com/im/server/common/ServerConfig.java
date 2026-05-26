@@ -90,4 +90,6 @@ public class ServerConfig {
     public String getApnsKeyId() { return System.getProperty("IM_APNS_KEY_ID", ""); }
     public boolean isFcmEnabled() { return Boolean.parseBoolean(System.getProperty("IM_FCM_ENABLED", "false")); }
     public String getFcmCredentialsPath() { return System.getProperty("IM_FCM_CREDENTIALS_PATH", ""); }
+    public boolean isNacosEnabled() { return Boolean.parseBoolean(System.getProperty("IM_NACOS_ENABLED", "false")); }
+    public String getNacosServerAddr() { return System.getProperty("IM_NACOS_SERVER_ADDR", "127.0.0.1:8848"); }
 }
