@@ -123,6 +123,8 @@ public class Main {
                 .compose(v -> vx.deployVerticle("com.im.server.logic.PushVerticle",
                         new DeploymentOptions().setConfig(depOpts.getConfig()).setInstances(2)))
                 .compose(id -> { log.info("PushVerticle deployed x2: {}", id); return io.vertx.core.Future.succeededFuture(); })
+                .compose(v -> vx.deployVerticle("com.im.server.logic.GroupPullVerticle", depOpts))
+                .compose(id -> { log.info("GroupPullVerticle deployed: {}", id); return io.vertx.core.Future.succeededFuture(); })
                 .mapEmpty();
     }
 

@@ -101,7 +101,25 @@
 - Vert.x Cluster 集群部署（Hazelcast 多节点 EventBus 通信）
 - Gateway 无状态化 + 优雅上下线
 - Folkmq 持久化消息投递（im-c2c / im-group topic）
-- 消息有序性（session_id sharding key） - 2026-05-26
+- 消息有序性（session_id sharding key）
+
+## v0.4.0-sprint2 - 2026-05-26
+
+### 变更内容
+- 消息按月分表：im_message → im_message_{YYYYMM}，insertMessage/getMessages/searchMessages/recallMessage/getMessageById 全部自动路由
+- ShardingService 分表路由层：按 serverTime 计算月表名，跨月查询合并排序，启动时自动创建当月表
+- 大群读写扩散：群成员 >200 人切换读扩散（只写一条+bitmap），≤200 人写扩散（为每成员推送）
+- 大群未读 Bitmap：Redis SETBIT 记录 seq 位，替代逐条 incr
+- 群成员 Redis 缓存：getGroupMembers 优先 Redis，miss 时查 DB 并回填，默认 TTL 300s
+- GroupPullVerticle：大群消息拉取接口（EventBus im.logic.GROUP_PULL）
+- im_group 表新增 max_members(5000) + diffusion_mode(0=写扩散/1=读扩散) 字段
+- DatabaseService 新增 getGroupMemberCount/getGroupDiffusionMode/updateGroupDiffusionMode 方法
+
+### 功能列表
+- 消息按月分表 + 自动路由
+- 大群读写扩散混合模式（阈值200人）
+- 大群未读 Redis Bitmap
+- 群成员 Redis 缓存 - 2026-05-26
 
 ### 变更内容
 - Docker Compose 部署方案完善：dufs 替代 MinIO、server/web Dockerfile 多阶段构建、nginx 反向代理、healthcheck

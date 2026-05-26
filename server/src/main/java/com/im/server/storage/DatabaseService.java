@@ -114,29 +114,23 @@ public class DatabaseService {
     }
 
     public Future<Void> insertMessage(Message msg) {
-        Promise<Void> promise = Promise.promise();
-        pool.preparedQuery("INSERT INTO im_message (msg_id, session_id, sender_id, seq, content_type, content_text, content_url, content_extra, client_msg_id, server_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-                .execute(Tuple.of(msg.getMsgId(), msg.getSessionId(), msg.getSenderId(), msg.getSeq(),
-                        msg.getContentType(), msg.getContentText(), msg.getContentUrl(), msg.getContentExtra(),
-                        msg.getClientMsgId(), msg.getServerTime()))
-                .onSuccess(rows -> promise.complete())
-                .onFailure(promise::fail);
-        return promise.future();
+        String tableName = ShardingService.getMonthlyTableName(msg.getServerTime());
+        return ensureMonthlyTable(tableName)
+                .compose(v -> {
+                    Promise<Void> promise = Promise.promise();
+                    pool.preparedQuery("INSERT INTO " + tableName + " (msg_id, session_id, sender_id, seq, content_type, content_text, content_url, content_extra, client_msg_id, server_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                            .execute(Tuple.of(msg.getMsgId(), msg.getSessionId(), msg.getSenderId(), msg.getSeq(),
+                                    msg.getContentType(), msg.getContentText(), msg.getContentUrl(), msg.getContentExtra(),
+                                    msg.getClientMsgId(), msg.getServerTime()))
+                            .onSuccess(rows -> promise.complete())
+                            .onFailure(promise::fail);
+                    return promise.future();
+                });
     }
 
     public Future<List<Message>> getMessages(String sessionId, long lastSeq, int limit) {
-        Promise<List<Message>> promise = Promise.promise();
-        pool.preparedQuery("SELECT msg_id, session_id, sender_id, seq, content_type, content_text, content_url, content_extra, client_msg_id, server_time FROM im_message WHERE session_id = ? AND seq > ? ORDER BY seq ASC LIMIT ?")
-                .execute(Tuple.of(sessionId, lastSeq, limit))
-                .onSuccess(rows -> {
-                    List<Message> messages = new ArrayList<>();
-                    for (Row row : rows) {
-                        messages.add(rowToMessage(row));
-                    }
-                    promise.complete(messages);
-                })
-                .onFailure(promise::fail);
-        return promise.future();
+        List<String> tables = ShardingService.getRecentTableNames(3);
+        return queryMessagesFromTables(tables, "session_id = ? AND seq > ?", Tuple.of(sessionId, lastSeq), "ORDER BY seq ASC LIMIT ?", Tuple.of(limit));
     }
 
     public Future<Void> upsertSession(long userId, String sessionId, int type, long targetId, String name, String lastMsg, long lastMsgTime) {
@@ -315,26 +309,25 @@ public class DatabaseService {
 
     public Future<Void> recallMessage(long msgId, String sessionId) {
         Promise<Void> promise = Promise.promise();
-        pool.preparedQuery("UPDATE im_message SET content_type = 6, content_text = '' WHERE msg_id = ? AND session_id = ?")
-                .execute(Tuple.of(msgId, sessionId))
-                .onSuccess(rows -> promise.complete())
-                .onFailure(promise::fail);
+        List<String> tables = ShardingService.getRecentTableNames(3);
+        io.vertx.core.Future<Void> chain = io.vertx.core.Future.succeededFuture();
+        for (String table : tables) {
+            chain = chain.compose(v -> {
+                Promise<Void> p = Promise.promise();
+                pool.preparedQuery("UPDATE " + table + " SET content_type = 6, content_text = '' WHERE msg_id = ? AND session_id = ?")
+                        .execute(Tuple.of(msgId, sessionId))
+                        .onSuccess(r -> p.complete())
+                        .onFailure(p::fail);
+                return p.future();
+            });
+        }
+        chain.onSuccess(v -> promise.complete()).onFailure(promise::fail);
         return promise.future();
     }
 
     public Future<Message> getMessageById(long msgId) {
-        Promise<Message> promise = Promise.promise();
-        pool.preparedQuery("SELECT msg_id, session_id, sender_id, seq, content_type, content_text, content_url, content_extra, client_msg_id, server_time FROM im_message WHERE msg_id = ?")
-                .execute(Tuple.of(msgId))
-                .onSuccess(rows -> {
-                    if (rows.iterator().hasNext()) {
-                        promise.complete(rowToMessage(rows.iterator().next()));
-                    } else {
-                        promise.complete(null);
-                    }
-                })
-                .onFailure(promise::fail);
-        return promise.future();
+        List<String> tables = ShardingService.getRecentTableNames(3);
+        return findMessageInTables(tables, msgId);
     }
 
     public Future<Void> updateLastReadSeq(long userId, String sessionId, long seq) {
@@ -347,26 +340,12 @@ public class DatabaseService {
     }
 
     public Future<List<Message>> searchMessages(String sessionId, String keyword, int limit) {
-        Promise<List<Message>> promise = Promise.promise();
-        String query;
-        Tuple params;
-        if (sessionId == null || sessionId.isEmpty()) {
-            query = "SELECT msg_id, session_id, sender_id, seq, content_type, content_text, content_url, content_extra, client_msg_id, server_time FROM im_message WHERE content_text LIKE ? ORDER BY server_time DESC LIMIT ?";
-            params = Tuple.of("%" + keyword + "%", limit);
-        } else {
-            query = "SELECT msg_id, session_id, sender_id, seq, content_type, content_text, content_url, content_extra, client_msg_id, server_time FROM im_message WHERE session_id = ? AND content_text LIKE ? ORDER BY server_time DESC LIMIT ?";
-            params = Tuple.of(sessionId, "%" + keyword + "%", limit);
-        }
-        pool.preparedQuery(query).execute(params)
-                .onSuccess(rows -> {
-                    List<Message> messages = new ArrayList<>();
-                    for (Row row : rows) {
-                        messages.add(rowToMessage(row));
-                    }
-                    promise.complete(messages);
-                })
-                .onFailure(promise::fail);
-        return promise.future();
+        List<String> tables = ShardingService.getRecentTableNames(3);
+        String whereClause = (sessionId == null || sessionId.isEmpty())
+                ? "content_text LIKE ?" : "session_id = ? AND content_text LIKE ?";
+        Tuple params = (sessionId == null || sessionId.isEmpty())
+                ? Tuple.of("%" + keyword + "%") : Tuple.of(sessionId, "%" + keyword + "%");
+        return queryMessagesFromTables(tables, whereClause, params, "ORDER BY server_time DESC LIMIT ?", Tuple.of(limit));
     }
 
     public Future<List<User>> getFriendList(long userId, int limit) {
@@ -434,6 +413,8 @@ public class DatabaseService {
                 group_id BIGINT AUTO_INCREMENT PRIMARY KEY,
                 name VARCHAR(64) NOT NULL,
                 owner_id BIGINT NOT NULL,
+                max_members INT DEFAULT 5000,
+                diffusion_mode TINYINT DEFAULT 0,
                 created_at BIGINT NOT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             CREATE TABLE IF NOT EXISTS im_group_member (
@@ -461,16 +442,136 @@ public class DatabaseService {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             ALTER TABLE im_session ADD COLUMN IF NOT EXISTS last_read_seq BIGINT DEFAULT 0;
             ALTER TABLE im_message ADD COLUMN IF NOT EXISTS is_recalled TINYINT DEFAULT 0;
+            ALTER TABLE im_group ADD COLUMN IF NOT EXISTS max_members INT DEFAULT 5000;
+            ALTER TABLE im_group ADD COLUMN IF NOT EXISTS diffusion_mode TINYINT DEFAULT 0;
             """;
         pool.query(sql).execute()
-                .onSuccess(rows -> {
-                    log.info("Database schema initialized");
+                .compose(v -> {
+                    return ensureMonthlyTable(ShardingService.getMonthlyTableName(System.currentTimeMillis()));
+                })
+                .onSuccess(v -> {
+                    log.info("Database schema initialized (with monthly sharding tables)");
                     promise.complete();
                 })
                 .onFailure(err -> {
                     log.error("Schema init failed: {}", err.getMessage());
                     promise.fail(err);
                 });
+        return promise.future();
+    }
+
+    public Future<Void> ensureMonthlyTable(String tableName) {
+        Promise<Void> promise = Promise.promise();
+        pool.query(ShardingService.getCreateMonthlyTableSQL(tableName)).execute()
+                .onSuccess(v -> promise.complete())
+                .onFailure(err -> {
+                    if (err.getMessage() != null && err.getMessage().contains("already exists")) {
+                        promise.complete();
+                    } else {
+                        promise.fail(err);
+                    }
+                });
+        return promise.future();
+    }
+
+    public Future<Integer> getGroupMemberCount(long groupId) {
+        Promise<Integer> promise = Promise.promise();
+        pool.preparedQuery("SELECT COUNT(*) FROM im_group_member WHERE group_id = ?")
+                .execute(Tuple.of(groupId))
+                .onSuccess(rows -> {
+                    if (rows.iterator().hasNext()) {
+                        promise.complete(rows.iterator().next().getInteger(0));
+                    } else {
+                        promise.complete(0);
+                    }
+                })
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    public Future<Integer> getGroupDiffusionMode(long groupId) {
+        Promise<Integer> promise = Promise.promise();
+        pool.preparedQuery("SELECT diffusion_mode FROM im_group WHERE group_id = ?")
+                .execute(Tuple.of(groupId))
+                .onSuccess(rows -> {
+                    if (rows.iterator().hasNext()) {
+                        promise.complete(rows.iterator().next().getInteger(0));
+                    } else {
+                        promise.complete(0);
+                    }
+                })
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    public Future<Void> updateGroupDiffusionMode(long groupId, int mode) {
+        Promise<Void> promise = Promise.promise();
+        pool.preparedQuery("UPDATE im_group SET diffusion_mode = ? WHERE group_id = ?")
+                .execute(Tuple.of(mode, groupId))
+                .onSuccess(v -> promise.complete())
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    private Future<List<Message>> queryMessagesFromTables(List<String> tables, String whereClause, Tuple whereParams, String orderByClause, Tuple orderParams) {
+        Promise<List<Message>> promise = Promise.promise();
+        List<Message> allMessages = new ArrayList<>();
+        int limit = 20;
+
+        io.vertx.core.Future<Void> chain = io.vertx.core.Future.succeededFuture();
+
+        for (String table : tables) {
+            chain = chain.compose(v -> {
+                Promise<List<Message>> p = Promise.promise();
+                String sql = "SELECT msg_id, session_id, sender_id, seq, content_type, content_text, content_url, content_extra, client_msg_id, server_time FROM " + table + " WHERE " + whereClause + " " + orderByClause;
+                Tuple fullParams = Tuple.tuple();
+                for (int i = 0; i < whereParams.size(); i++) {
+                    fullParams.addValue(whereParams.getValue(i));
+                }
+                for (int i = 0; i < orderParams.size(); i++) {
+                    fullParams.addValue(orderParams.getValue(i));
+                }
+                pool.preparedQuery(sql).execute(fullParams)
+                        .onSuccess(rows -> {
+                            List<Message> msgs = new ArrayList<>();
+                            for (Row row : rows) { msgs.add(rowToMessage(row)); }
+                            p.complete(msgs);
+                        })
+                        .onFailure(p::fail);
+                return p.future().map(msgs -> { allMessages.addAll(msgs); return null; });
+            });
+        }
+
+        chain.onSuccess(v -> {
+            allMessages.sort((a, b) -> Long.compare(a.getSeq(), b.getSeq()));
+            if (allMessages.size() > limit) {
+                promise.complete(allMessages.subList(0, limit));
+            } else {
+                promise.complete(allMessages);
+            }
+        }).onFailure(promise::fail);
+        return promise.future();
+    }
+
+    private Future<Message> findMessageInTables(List<String> tables, long msgId) {
+        Promise<Message> promise = Promise.promise();
+        io.vertx.core.Future<Message> chain = io.vertx.core.Future.succeededFuture(null);
+
+        for (String table : tables) {
+            chain = chain.compose(found -> {
+                if (found != null) return io.vertx.core.Future.succeededFuture(found);
+                Promise<Message> p = Promise.promise();
+                pool.preparedQuery("SELECT msg_id, session_id, sender_id, seq, content_type, content_text, content_url, content_extra, client_msg_id, server_time FROM " + table + " WHERE msg_id = ?")
+                        .execute(Tuple.of(msgId))
+                        .onSuccess(rows -> {
+                            if (rows.iterator().hasNext()) { p.complete(rowToMessage(rows.iterator().next())); }
+                            else { p.complete(null); }
+                        })
+                        .onFailure(p::fail);
+                return p.future();
+            });
+        }
+        chain.onSuccess(promise::complete).onFailure(promise::fail);
         return promise.future();
     }
 

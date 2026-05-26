@@ -7,6 +7,7 @@ import com.im.server.mq.FolkmqService;
 import com.im.server.storage.DatabaseService;
 import com.im.server.storage.Message;
 import com.im.server.storage.RedisService;
+import com.im.server.storage.ShardingService;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.json.JsonObject;
 import org.slf4j.Logger;
@@ -80,35 +81,55 @@ public class GroupVerticle extends AbstractVerticle {
             long groupId = req.getGroupId();
             String sessionId = "group_" + groupId;
 
-            // 1. Generate seq via Redis INCR
-            redisService.incrSeq(sessionId)
-                    .compose(seq -> {
-                        long msgId = SnowflakeIdHolder.nextId();
-                        long serverTime = System.currentTimeMillis();
+            // Check group member cache first, then DB
+            redisService.getCachedGroupMembers(groupId)
+                    .compose(cached -> {
+                        if (cached != null) {
+                            List<Long> members = parseMemberCsv(cached);
+                            return io.vertx.core.Future.succeededFuture(members);
+                        }
+                        return dbService.getGroupMembers(groupId)
+                                .map(members -> {
+                                    String csv = members.stream().map(String::valueOf).reduce((a, b) -> a + "," + b).orElse("");
+                                    redisService.cacheGroupMembersDefault(groupId, csv);
+                                    return members;
+                                });
+                    })
+                    .compose(members -> {
+                        boolean isLarge = ShardingService.isLargeGroup(members.size());
 
-                        // 2. Persist message (one copy for group session)
-                        ImProto.MessageContent content = req.getContent();
-                        Message dbMsg = new Message();
-                        dbMsg.setMsgId(msgId);
-                        dbMsg.setSessionId(sessionId);
-                        dbMsg.setSenderId(senderId);
-                        dbMsg.setSeq(seq);
-                        dbMsg.setContentType(content.getMsgType());
-                        dbMsg.setContentText(content.getText());
-                        dbMsg.setContentUrl(content.getUrl());
-                        dbMsg.setContentExtra(content.getExtra());
-                        dbMsg.setClientMsgId(req.getClientMsgId());
-                        dbMsg.setServerTime(serverTime);
+                        // Auto-switch diffusion mode if needed
+                        if (isLarge) {
+                            dbService.getGroupDiffusionMode(groupId)
+                                    .onSuccess(mode -> {
+                                        if (mode == 0) dbService.updateGroupDiffusionMode(groupId, 1);
+                                    });
+                        }
 
-                        return dbService.insertMessage(dbMsg)
-                                .compose(v -> {
-                                    // 3. Query group members
-                                    return dbService.getGroupMembers(groupId);
-                                })
-                                .map(members -> new GroupResult(msgId, seq, serverTime, sessionId, senderId, groupId, content, members, req.getAtUserIdsList()));
+                        return redisService.incrSeq(sessionId)
+                                .compose(seq -> {
+                                    long msgId = SnowflakeIdHolder.nextId();
+                                    long serverTime = System.currentTimeMillis();
+
+                                    ImProto.MessageContent content = req.getContent();
+                                    Message dbMsg = new Message();
+                                    dbMsg.setMsgId(msgId);
+                                    dbMsg.setSessionId(sessionId);
+                                    dbMsg.setSenderId(senderId);
+                                    dbMsg.setSeq(seq);
+                                    dbMsg.setContentType(content.getMsgType());
+                                    dbMsg.setContentText(content.getText());
+                                    dbMsg.setContentUrl(content.getUrl());
+                                    dbMsg.setContentExtra(content.getExtra());
+                                    dbMsg.setClientMsgId(req.getClientMsgId());
+                                    dbMsg.setServerTime(serverTime);
+
+                                    return dbService.insertMessage(dbMsg)
+                                            .map(v -> new GroupResult(msgId, seq, serverTime, sessionId, senderId, groupId, content, members, req.getAtUserIdsList(), isLarge));
+                                });
                     })
                     .onSuccess(result -> {
-                        // 4. ACK to sender
+                        // ACK to sender
                         ImProto.GroupMsgResponse ack = ImProto.GroupMsgResponse.newBuilder()
                                 .setCode(0).setMsg("ok")
                                 .setMsgId(result.msgId).setSeq(result.seq)
@@ -116,47 +137,61 @@ public class GroupVerticle extends AbstractVerticle {
                                 .build();
                         msg.reply(ack.toByteArray());
 
-                        // 5. Push to all online group members, INCR unread for offline
-                        for (Long memberId : result.members) {
-                            if (memberId == result.senderId) {
-                                // Update sender session but don't push to self
-                                String lastMsg = result.content.getText().length() > 50
-                                        ? result.content.getText().substring(0, 50) : result.content.getText();
-                                dbService.upsertSession(memberId, result.sessionId, 2, result.groupId, "",
-                                        lastMsg, result.serverTime);
-                                continue;
+                        // Update sender session
+                        String lastMsg = result.content.getText().length() > 50
+                                ? result.content.getText().substring(0, 50) : result.content.getText();
+                        dbService.upsertSession(result.senderId, result.sessionId, 2, result.groupId, "", lastMsg, result.serverTime);
+
+                        if (result.isLarge) {
+                            // Read diffusion: set unread bitmap, push notify to all members
+                            redisService.setUnreadBitmap(result.sessionId, result.seq);
+                            for (Long memberId : result.members) {
+                                if (memberId == result.senderId) continue;
+                                dbService.upsertSession(memberId, result.sessionId, 2, result.groupId, "", lastMsg, result.serverTime);
+                                redisService.incrUnread(memberId, result.sessionId);
+                                dbService.incrUnreadCount(memberId, result.sessionId);
+
+                                ImProto.GroupMsgNotify notify = ImProto.GroupMsgNotify.newBuilder()
+                                        .setMsgId(result.msgId).setSenderId(result.senderId)
+                                        .setGroupId(result.groupId).setSessionId(result.sessionId)
+                                        .setSeq(result.seq).setContent(result.content)
+                                        .addAllAtUserIds(result.atUserIds)
+                                        .setServerTime(result.serverTime)
+                                        .build();
+                                byte[] pushData = PushEnvelope.create(memberId, Cmd.GROUP_MSG_NOTIFY, notify.toByteArray());
+                                FolkmqService folkmq = FolkmqServiceHolder.getInstance();
+                                if (folkmq != null) {
+                                    folkmq.publishOrdered("im-group", pushData, result.sessionId);
+                                } else {
+                                    vertx.eventBus().send("im.logic.PUSH", pushData);
+                                }
                             }
+                        } else {
+                            // Write diffusion: same as before
+                            for (Long memberId : result.members) {
+                                if (memberId == result.senderId) continue;
+                                dbService.upsertSession(memberId, result.sessionId, 2, result.groupId, "", lastMsg, result.serverTime);
 
-                            // Update member session
-                            String lastMsg = result.content.getText().length() > 50
-                                    ? result.content.getText().substring(0, 50) : result.content.getText();
-                            dbService.upsertSession(memberId, result.sessionId, 2, result.groupId, "",
-                                    lastMsg, result.serverTime);
-
-                            // Push notify via Folkmq
-                            ImProto.GroupMsgNotify notify = ImProto.GroupMsgNotify.newBuilder()
-                                    .setMsgId(result.msgId).setSenderId(result.senderId)
-                                    .setGroupId(result.groupId).setSessionId(result.sessionId)
-                                    .setSeq(result.seq).setContent(result.content)
-                                    .addAllAtUserIds(result.atUserIds)
-                                    .setServerTime(result.serverTime)
-                                    .build();
-                            byte[] pushData = PushEnvelope.create(memberId, Cmd.GROUP_MSG_NOTIFY, notify.toByteArray());
-
-                            FolkmqService folkmq = FolkmqServiceHolder.getInstance();
-                            if (folkmq != null) {
-                                folkmq.publishOrdered("im-group", pushData, result.sessionId);
-                            } else {
-                                vertx.eventBus().send("im.logic.PUSH", pushData);
+                                ImProto.GroupMsgNotify notify = ImProto.GroupMsgNotify.newBuilder()
+                                        .setMsgId(result.msgId).setSenderId(result.senderId)
+                                        .setGroupId(result.groupId).setSessionId(result.sessionId)
+                                        .setSeq(result.seq).setContent(result.content)
+                                        .addAllAtUserIds(result.atUserIds)
+                                        .setServerTime(result.serverTime)
+                                        .build();
+                                byte[] pushData = PushEnvelope.create(memberId, Cmd.GROUP_MSG_NOTIFY, notify.toByteArray());
+                                FolkmqService folkmq = FolkmqServiceHolder.getInstance();
+                                if (folkmq != null) {
+                                    folkmq.publishOrdered("im-group", pushData, result.sessionId);
+                                } else {
+                                    vertx.eventBus().send("im.logic.PUSH", pushData);
+                                }
+                                redisService.incrUnread(memberId, result.sessionId);
+                                dbService.incrUnreadCount(memberId, result.sessionId);
                             }
-
-                            // INCR unread for all non-sender members
-                            redisService.incrUnread(memberId, result.sessionId);
-                            dbService.incrUnreadCount(memberId, result.sessionId);
                         }
 
-                        log.info("GROUP msg: sender={} group={} seq={} members={}", result.senderId, result.groupId, result.seq, result.members.size());
-
+                        log.info("GROUP msg: sender={} group={} seq={} members={} mode={}", result.senderId, result.groupId, result.seq, result.members.size(), result.isLarge ? "read" : "write");
                     })
                     .onFailure(err -> {
                         log.error("GROUP msg error: {}", err.getMessage());
@@ -171,6 +206,15 @@ public class GroupVerticle extends AbstractVerticle {
                     .setCode(1).setMsg("parse error").build();
             msg.reply(ack.toByteArray());
         }
+    }
+
+    private List<Long> parseMemberCsv(String csv) {
+        if (csv == null || csv.isEmpty()) return List.of();
+        List<Long> members = new ArrayList<>();
+        for (String s : csv.split(",")) {
+            if (!s.isEmpty()) members.add(Long.parseLong(s));
+        }
+        return members;
     }
 
     private void handleGroupCreate(io.vertx.core.eventbus.Message<Object> msg, JsonObject req) {
@@ -217,7 +261,7 @@ public class GroupVerticle extends AbstractVerticle {
 
     private record GroupResult(long msgId, long seq, long serverTime, String sessionId,
                                 long senderId, long groupId, ImProto.MessageContent content,
-                                List<Long> members, List<Long> atUserIds) {}
+                                List<Long> members, List<Long> atUserIds, boolean isLarge) {}
 
     private void handleGroupInvite(io.vertx.core.eventbus.Message<Object> msg, JsonObject req) {
         long userId = req.getLong("userId", -1L);

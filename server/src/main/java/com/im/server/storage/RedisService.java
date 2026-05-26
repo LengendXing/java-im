@@ -19,6 +19,9 @@ public class RedisService {
     private static final String UNREAD_KEY = KEY_PREFIX + ":unread:";
     private static final String TOKEN_KEY = KEY_PREFIX + ":token:";
     private static final String GROUP_MEMBERS_KEY = KEY_PREFIX + ":group_members:";
+    private static final String UNREAD_BITMAP_KEY = KEY_PREFIX + ":unread_bitmap:";
+
+    private static final int GROUP_MEMBER_CACHE_TTL = 300;
 
     private RedisAPI redis;
 
@@ -113,6 +116,10 @@ public class RedisService {
                 .mapEmpty();
     }
 
+    public Future<Void> cacheGroupMembersDefault(long groupId, String memberIdsCsv) {
+        return cacheGroupMembers(groupId, memberIdsCsv, GROUP_MEMBER_CACHE_TTL);
+    }
+
     public Future<String> getCachedGroupMembers(long groupId) {
         Promise<String> promise = Promise.promise();
         redis.get(GROUP_MEMBERS_KEY + groupId)
@@ -123,6 +130,22 @@ public class RedisService {
 
     public Future<Void> invalidateGroupMembersCache(long groupId) {
         return redis.del(List.of(GROUP_MEMBERS_KEY + groupId)).mapEmpty();
+    }
+
+    public Future<Void> setUnreadBitmap(String sessionId, long seq) {
+        return redis.setbit(UNREAD_BITMAP_KEY + sessionId, String.valueOf(seq), "1").mapEmpty();
+    }
+
+    public Future<Long> getUnreadBitmapCount(String sessionId, long fromSeq, long toSeq) {
+        Promise<Long> promise = Promise.promise();
+        redis.bitcount(List.of(UNREAD_BITMAP_KEY + sessionId))
+                .onSuccess(val -> promise.complete(Long.parseLong(val.toString())))
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    public Future<Void> clearUnreadBitmap(String sessionId) {
+        return redis.del(List.of(UNREAD_BITMAP_KEY + sessionId)).mapEmpty();
     }
 
     public RedisAPI getRedisAPI() {
