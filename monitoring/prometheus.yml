@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "alert_rules.yml"
+
+scrape_configs:
+  - job_name: 'im-server'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['im-server:8080']
+    dns_sd_configs:
+      - names:
+          - 'im-server'
+        type: 'A'
+        port: 8080

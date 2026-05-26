@@ -49,56 +49,55 @@ services:
       - "18602:18602"
       - "8602:8602"
     environment:
-      FOLKMQ_BROKER_DEFAULT: "folkmq:18602"
-    volumes:
-      - folkmq_data:/data
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8602/"]
-      interval: 5s
-      retries: 5
+[108 more lines]  redis_data:
+  mysql_data:
+  uploads_data:
+  folkmq_data:
 
-  im-server:
-    build:
-      context: .
-      dockerfile: server/Dockerfile
-    ports:
-      - "8800:8800"   # TCP
-      - "8801:8801"   # WebSocket
-      - "8080:8080"   # HTTP API
-    environment:
-      IM_REDIS_HOST: redis
-      IM_REDIS_PORT: 6379
-      IM_MYSQL_HOST: mysql
-      IM_MYSQL_PORT: 3306
-      IM_MYSQL_DB: im_db
-      IM_MYSQL_USER: im_user
-      IM_MYSQL_PASSWORD: im_pass_2024
-      IM_JWT_SECRET: change-me-in-production-env
-      IM_FOLKMQ_HOST: folkmq
-      IM_FOLKMQ_PORT: 18602
-      DUFS_URL: http://dufs:5100
-      dufs.upload.dir: /app/uploads
-    volumes:
-      - uploads_data:/app/uploads
-    depends_on:
-      redis:
-        condition: service_healthy
-      mysql:
-        condition: service_healthy
-      dufs:
-        condition: service_healthy
-      folkmq:
-        condition: service_healthy
-    restart: on-failure
+  # === Observability Stack ===
 
-  im-web:
-    build:
-      context: ./client-web
-      dockerfile: Dockerfile
+  prometheus:
+    image: prom/prometheus:v2.51.0
     ports:
-      - "3000:80"
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - prometheus_data:/prometheus
     depends_on:
       - im-server
+    restart: on-failure
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/java-im.json
+    volumes:
+      - ./monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/java-im.json
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: on-failure
+
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+    restart: on-failure
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    volumes:
+      - ./monitoring/promtail.yml:/etc/promtail/config.yml
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
     restart: on-failure
 
 volumes:
@@ -106,3 +105,6 @@ volumes:
   mysql_data:
   uploads_data:
   folkmq_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:

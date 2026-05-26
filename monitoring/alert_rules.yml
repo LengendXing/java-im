@@ -1,0 +1,26 @@
+groups:
+  - name: im-alerts
+    rules:
+      - alert: HighConnectionCount
+        expr: im_connections > 10000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "IM连接数超过10k"
+
+      - alert: HighMessageLatency
+        expr: histogram_quantile(0.99, rate(im_message_duration_bucket[5m])) > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "消息延迟P99超过1s"
+
+      - alert: HighErrorRate
+        expr: rate(im_errors_total[5m]) / rate(im_requests_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "错误率超过1%"

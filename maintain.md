@@ -168,3 +168,19 @@
 - 离线推送（APNs/FCM）
 - 推送频率限制
 - E2EE 公钥存储与交换
+
+## v0.4.0-sprint4 - 2026-05-26
+
+### 变更内容
+- Prometheus 采集配置（15s间隔，im-server target）
+- Grafana 面板 JSON（连接数/消息量/延迟/P99/错误率/Redis命中率）
+- Loki 日志聚合 + Promtail 采集配置
+- AlertManager 告警规则（连接数>10k、延迟P99>1s、错误率>1%）
+- JMeter 压测脚本（注册/登录，参数化并发数）
+- Docker Compose 新增 prometheus/grafana/loki/promtail 服务
+
+### 功能列表
+- Prometheus + Grafana 可观测性
+- Loki 日志聚合
+- 告警规则
+- JMeter 压测脚本
