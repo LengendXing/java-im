@@ -99,7 +99,11 @@ public class PushVerticle extends AbstractVerticle {
 
     private void sendOfflinePush(long userId, int cmd, byte[] payload) {
         PushRateLimiter limiter = PushServiceHolder.getRateLimiter();
-        if (limiter != null && !limiter.shouldPush(userId)) return;
+        if (limiter != null && !limiter.shouldPush(userId)) {
+            log.warn("push rate limited for userId={}", userId);
+            sendDeadLetterAlert(userId, cmd, "rate_limited");
+            return;
+        }
 
         DatabaseService db = DatabaseServiceHolder.getInstance();
         ApnsService apns = PushServiceHolder.getApnsService();
@@ -108,16 +112,56 @@ public class PushVerticle extends AbstractVerticle {
         String title = "新消息";
         String body = "你有一条新消息";
 
-        // Try iOS (platform=1) then Android (platform=2)
+        boolean pushed = false;
         if (apns != null && apns.isEnabled()) {
-            db.getPushToken(userId, 1).onSuccess(token -> {
-                if (token != null) apns.push(token, title, body, 1);
-            });
+            var tokenFuture = db.getPushToken(userId, 1);
+            if (tokenFuture != null) {
+                tokenFuture.onSuccess(token -> {
+                    if (token != null) {
+                        apns.push(token, title, body, 1);
+                    } else {
+                        sendDeadLetterAlert(userId, cmd, "no_apns_token");
+                    }
+                }).onFailure(err -> sendDeadLetterAlert(userId, cmd, "apns_error:" + err.getMessage()));
+                pushed = true;
+            }
         }
         if (fcm != null && fcm.isEnabled()) {
-            db.getPushToken(userId, 2).onSuccess(token -> {
-                if (token != null) fcm.push(token, title, body);
-            });
+            var tokenFuture = db.getPushToken(userId, 2);
+            if (tokenFuture != null) {
+                tokenFuture.onSuccess(token -> {
+                    if (token != null) {
+                        fcm.push(token, title, body);
+                    } else {
+                        sendDeadLetterAlert(userId, cmd, "no_fcm_token");
+                    }
+                }).onFailure(err -> sendDeadLetterAlert(userId, cmd, "fcm_error:" + err.getMessage()));
+                pushed = true;
+            }
+        }
+        if (!pushed) {
+            log.info("no push service enabled for userId={}, message queued for next online", userId);
+        }
+    }
+
+    private void sendDeadLetterAlert(long userId, int cmd, String reason) {
+        log.warn("dead letter: userId={} cmd=0x{} reason={}", userId, Integer.toHexString(cmd), reason);
+        try {
+            String webhookUrl = System.getProperty("IM_FEISHU_WEBHOOK", "");
+            if (webhookUrl.isEmpty()) return;
+
+            String payload = String.format(
+                    "{\"msg_type\":\"interactive\",\"card\":{\"header\":{\"title\":{\"tag\":\"plain_text\",\"content\":\"⚠️ 【告警】消息推送死信\"},\"template\":\"orange\"},\"elements\":[{\"tag\":\"markdown\",\"content\":\"**用户ID：** %d\\n**命令：** 0x%s\\n**原因：** %s\\n**时间：** %s\"}]}}",
+                    userId, Integer.toHexString(cmd), reason, java.time.Instant.now().toString()
+            );
+            vertx.createHttpClient()
+                    .request(new io.vertx.core.http.RequestOptions()
+                            .setMethod(io.vertx.core.http.HttpMethod.POST)
+                            .setAbsoluteURI(webhookUrl))
+                    .onSuccess(req -> req.putHeader("Content-Type", "application/json").end(payload))
+                    .onFailure(err -> log.warn("feishu dead letter alert failed: {}", err.getMessage()));
+        } catch (Exception e) {
+            log.warn("dead letter alert error: {}", e.getMessage());
         }
     }
 }

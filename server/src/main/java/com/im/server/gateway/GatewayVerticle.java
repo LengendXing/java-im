@@ -2,6 +2,7 @@ package com.im.server.gateway;
 
 import com.im.server.common.*;
 import com.im.protocol.ImProto;
+import com.im.server.registry.NacosRegistryHolder;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServer;
@@ -35,6 +36,16 @@ public class GatewayVerticle extends AbstractVerticle {
                         .onFailure(err -> log.warn("route remove failed for user {}: {}", conn.getUserId(), err.getMessage()));
                 conn.close();
             }
+        }
+
+        // Deregister from Nacos if enabled
+        var nacos = NacosRegistryHolder.getInstance();
+        if (nacos != null && nacos.isEnabled()) {
+            nacos.deregister(
+                    "0.0.0.0",
+                    serverConfig != null ? serverConfig.getHttpPort() : 8080,
+                    "im"
+            );
         }
 
         log.info("GatewayVerticle {} stopped, all connections drained", gatewayId);

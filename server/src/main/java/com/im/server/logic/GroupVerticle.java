@@ -98,15 +98,17 @@ public class GroupVerticle extends AbstractVerticle {
                     .compose(members -> {
                         boolean isLarge = ShardingService.isLargeGroup(members.size());
 
-                        // Auto-switch diffusion mode if needed
-                        if (isLarge) {
-                            dbService.getGroupDiffusionMode(groupId)
-                                    .onSuccess(mode -> {
-                                        if (mode == 0) dbService.updateGroupDiffusionMode(groupId, 1);
-                                    });
-                        }
-
-                        return redisService.incrSeq(sessionId)
+                        // Auto-switch diffusion mode and invalidate cache when crossing threshold
+                        int targetMode = isLarge ? 1 : 0;
+                        return dbService.getGroupDiffusionMode(groupId)
+                                .compose(currentMode -> {
+                                    if (currentMode != targetMode) {
+                                        return dbService.updateGroupDiffusionMode(groupId, targetMode)
+                                                .compose(v2 -> redisService.invalidateGroupMembersCache(groupId));
+                                    }
+                                    return io.vertx.core.Future.succeededFuture();
+                                })
+                                .compose(v -> redisService.incrSeq(sessionId))
                                 .compose(seq -> {
                                     long msgId = SnowflakeIdHolder.nextId();
                                     long serverTime = System.currentTimeMillis();
@@ -125,7 +127,7 @@ public class GroupVerticle extends AbstractVerticle {
                                     dbMsg.setServerTime(serverTime);
 
                                     return dbService.insertMessage(dbMsg)
-                                            .map(v -> new GroupResult(msgId, seq, serverTime, sessionId, senderId, groupId, content, members, req.getAtUserIdsList(), isLarge));
+                                            .map(v2 -> new GroupResult(msgId, seq, serverTime, sessionId, senderId, groupId, content, members, req.getAtUserIdsList(), isLarge));
                                 });
                     })
                     .onSuccess(result -> {
@@ -278,6 +280,7 @@ public class GroupVerticle extends AbstractVerticle {
         }
         chain.onSuccess(v -> {
             msg.reply(new JsonObject().put("code", 0).put("msg", "ok"));
+            redisService.invalidateGroupMembersCache(groupId);
             log.info("group invite: {} invited {} users to group {}", userId, userIds.size(), groupId);
         }).onFailure(err -> msg.reply(new JsonObject().put("code", 1).put("msg", "invite failed")));
     }
@@ -300,6 +303,7 @@ public class GroupVerticle extends AbstractVerticle {
             return chain;
         }).onSuccess(v -> {
             msg.reply(new JsonObject().put("code", 0).put("msg", "ok"));
+            redisService.invalidateGroupMembersCache(groupId);
             log.info("group kick: {} kicked {} users from group {}", userId, userIds.size(), groupId);
         }).onFailure(err -> msg.reply(new JsonObject().put("code", 1).put("msg", err.getMessage())));
     }
