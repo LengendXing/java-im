@@ -1,0 +1,23 @@
+{
+  "tcpPort": 8800,
+  "wsPort": 8801,
+  "httpPort": 8080,
+  "redis": {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "password": "",
+    "database": 0
+  },
+  "mysql": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "database": "java_im",
+    "user": "root",
+    "password": "root"
+  },
+  "jwtSecret": "change-me-in-production-use-env",
+  "jwtTtlDays": 7,
+  "workerId": 1,
+  "heartbeatInterval": 30000,
+  "heartbeatTimeout": 90000
+}

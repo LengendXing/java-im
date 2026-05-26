@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: im_root_pass
+      MYSQL_DATABASE: im_db
+      MYSQL_USER: im_user
+      MYSQL_PASSWORD: im_pass_2024
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./server/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: im_minio
+      MINIO_ROOT_PASSWORD: im_minio_pass
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+
+  im-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8800:8800"  # TCP
+      - "8801:8801"  # WebSocket
+      - "8080:8080"  # HTTP API
+    environment:
+      IM_REDIS_HOST: redis
+      IM_REDIS_PORT: 6379
+      IM_MYSQL_HOST: mysql
+      IM_MYSQL_PORT: 3306
+      IM_MYSQL_DB: im_db
+      IM_MYSQL_USER: im_user
+      IM_MYSQL_PASSWORD: im_pass_2024
+      IM_JWT_SECRET: change-me-in-production-env
+      IM_MINIO_HOST: minio
+      IM_MINIO_PORT: 9000
+    depends_on:
+      - redis
+      - mysql
+      - minio
+    restart: on-failure
+
+  im-web:
+    build:
+      context: ./client-web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - im-server
+
+volumes:
+  redis_data:
+  mysql_data:
+  minio_data:

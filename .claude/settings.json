@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "anydb": {
+      "command": "npx",
+      "args": ["-y", "anydb-mcp@latest"],
+      "env": {
+        "MYSQL_HOST": "127.0.0.1",
+        "MYSQL_PORT": "3306",
+        "MYSQL_USER": "root",
+        "MYSQL_PASSWORD": "root",
+        "MYSQL_DATABASE": "java_im",
+        "REDIS_URL": "redis://127.0.0.1:6379"
+      }
+    }
+  }
+}

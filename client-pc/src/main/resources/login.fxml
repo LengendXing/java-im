@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.im.client.controller.LoginController"
+      styleClass="login-root" alignment="CENTER" spacing="16"
+      prefWidth="360" prefHeight="520">
+
+    <padding>
+        <Insets top="48" right="32" bottom="48" left="32"/>
+    </padding>
+
+    <StackPane fx:id="logoPane" alignment="CENTER" />
+
+    <Label text="WeChat IM" styleClass="login-title"/>
+    <Label text="Sign in to continue" styleClass="login-subtitle"/>
+
+    <VBox spacing="8" VBox.vgrow="ALWAYS">
+        <Label text="Username" styleClass="field-label"/>
+        <TextField fx:id="usernameField" promptText="Enter username" styleClass="input-field"/>
+    </VBox>
+
+    <VBox spacing="8">
+        <Label text="Password" styleClass="field-label"/>
+        <PasswordField fx:id="passwordField" promptText="Enter password" styleClass="input-field"/>
+    </VBox>
+
+    <Label fx:id="errorLabel" styleClass="error-label"/>
+
+    <Button fx:id="loginButton" text="Login" onAction="#onLogin" styleClass="primary-button"
+            maxWidth="Infinity"/>
+
+    <Label fx:id="registerLink" text="Create new account" styleClass="link-label"
+           onMouseClicked="#onRegisterLink"/>
+</VBox>

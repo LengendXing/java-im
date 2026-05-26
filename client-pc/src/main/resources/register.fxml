@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.im.client.controller.RegisterController"
+      styleClass="login-root" alignment="CENTER" spacing="14"
+      prefWidth="360" prefHeight="560">
+
+    <padding>
+        <Insets top="36" right="32" bottom="36" left="32"/>
+    </padding>
+
+    <StackPane fx:id="logoPane" alignment="CENTER" />
+
+    <Label text="Create Account" styleClass="login-title"/>
+    <Label text="Register a new account" styleClass="login-subtitle"/>
+
+    <VBox spacing="8">
+        <Label text="Username" styleClass="field-label"/>
+        <TextField fx:id="usernameField" promptText="Choose username" styleClass="input-field"/>
+    </VBox>
+
+    <VBox spacing="8">
+        <Label text="Password" styleClass="field-label"/>
+        <PasswordField fx:id="passwordField" promptText="Choose password" styleClass="input-field"/>
+    </VBox>
+
+    <VBox spacing="8">
+        <Label text="Confirm Password" styleClass="field-label"/>
+        <PasswordField fx:id="confirmPasswordField" promptText="Confirm password" styleClass="input-field"/>
+    </VBox>
+
+    <Label fx:id="errorLabel" styleClass="error-label"/>
+
+    <Button fx:id="registerButton" text="Register" onAction="#onRegister" styleClass="primary-button"
+            maxWidth="Infinity"/>
+
+    <Label fx:id="backLink" text="Back to Login" styleClass="link-label"
+           onMouseClicked="#onBackLink"/>
+</VBox>

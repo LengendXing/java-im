@@ -1,0 +1,243 @@
+/* ===== WeChat Green Theme ===== */
+:root {
+    -im-green: #07C160;
+    -im-green-hover: #06AD56;
+    -im-green-pressed: #059A4C;
+    -im-bg: #F5F5F5;
+    -im-bg-dark: #1A1A1A;
+    -im-surface: #FFFFFF;
+    -im-surface-dark: #2C2C2C;
+    -im-text: #181818;
+    -im-text-secondary: #999999;
+    -im-text-dark: #E0E0E0;
+    -im-border: #E0E0E0;
+    -im-border-dark: #3A3A3A;
+    -im-bubble-self: #95EC69;
+    -im-bubble-other: #FFFFFF;
+    -im-bubble-other-dark: #3A3A3A;
+    -im-error: #FA5151;
+    -im-badge: #FA5151;
+}
+
+.root, .main-root, .login-root {
+    -fx-background-color: -im-bg;
+}
+
+/* ===== Login / Register ===== */
+.login-title {
+    -fx-text-fill: -im-green;
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+}
+
+.login-subtitle {
+    -fx-text-fill: -im-text-secondary;
+    -fx-font-size: 13px;
+}
+
+.field-label {
+    -fx-text-fill: -im-text;
+    -fx-font-size: 12px;
+}
+
+.input-field {
+    -fx-background-color: -im-surface;
+    -fx-text-fill: -im-text;
+    -fx-border-color: -im-border;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10 14;
+    -fx-font-size: 14px;
+}
+
+.input-field:focused {
+    -fx-border-color: -im-green;
+}
+
+.primary-button {
+    -fx-background-color: -im-green;
+    -fx-text-fill: white;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-padding: 12 0;
+    -fx-cursor: hand;
+}
+
+.primary-button:hover {
+    -fx-background-color: -im-green-hover;
+}
+
+.primary-button:pressed {
+    -fx-background-color: -im-green-pressed;
+}
+
+.primary-button:disabled {
+    -fx-background-color: #C0C0C0;
+    -fx-text-fill: #FFFFFF;
+}
+
+.error-label {
+    -fx-text-fill: -im-error;
+    -fx-font-size: 12px;
+}
+
+.link-label {
+    -fx-text-fill: -im-green;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+}
+
+.link-label:hover {
+    -fx-underline: true;
+}
+
+/* ===== Session Panel ===== */
+.session-panel {
+    -fx-background-color: -im-surface;
+    -fx-border-color: -im-border;
+    -fx-border-width: 0 1 0 0;
+}
+
+.session-header {
+    -fx-background-color: -im-surface;
+    -fx-border-color: -im-border;
+    -fx-border-width: 0 0 1 0;
+}
+
+.session-header-title {
+    -fx-text-fill: -im-text;
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+}
+
+.logout-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -im-text-secondary;
+    -fx-font-size: 12px;
+    -fx-cursor: hand;
+}
+
+.logout-button:hover {
+    -fx-text-fill: -im-error;
+}
+
+.session-list {
+    -fx-background-color: -im-surface;
+    -fx-control-inner-background: -im-surface;
+}
+
+.session-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.session-list .list-cell:hover {
+    -fx-background-color: #F0F0F0;
+}
+
+.session-list .list-cell:selected {
+    -fx-background-color: #E8E8E8;
+}
+
+/* ===== Chat Panel ===== */
+.chat-panel {
+    -fx-background-color: -im-bg;
+}
+
+.chat-header {
+    -fx-background-color: -im-surface;
+}
+
+.chat-target-label {
+    -fx-text-fill: -im-text;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+.message-list {
+    -fx-background-color: -im-bg;
+    -fx-control-inner-background: -im-bg;
+}
+
+.message-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.input-area {
+    -fx-background-color: -im-surface;
+    -fx-border-color: -im-border;
+    -fx-border-width: 1 0 0 0;
+}
+
+.message-input {
+    -fx-background-color: -im-surface;
+    -fx-text-fill: -im-text;
+    -fx-border-color: -im-border;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 8 12;
+    -fx-font-size: 14px;
+    -fx-max-height: 80;
+}
+
+.message-input:focused {
+    -fx-border-color: -im-green;
+}
+
+.send-button {
+    -fx-background-color: -im-green;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-padding: 8 24;
+    -fx-margin: 0 0 0 8;
+    -fx-cursor: hand;
+}
+
+.send-button:hover {
+    -fx-background-color: -im-green-hover;
+}
+
+.send-button:disabled {
+    -fx-background-color: #C0C0C0;
+    -fx-text-fill: #FFFFFF;
+}
+
+/* ===== Scrollbar ===== */
+.scroll-bar {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #C0C0C0;
+    -fx-background-radius: 4;
+}
+
+.scroll-bar .track {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+/* ===== Separator ===== */
+.separator .line {
+    -fx-background-color: -im-border;
+}
+
+/* ===== Logo ===== */
+.logo-icon {
+    -fx-text-fill: white;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+}
+
+.logo-circle {
+    -fx-fill: -im-green;
+}

@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --im-green: #07C160;
+    --im-green-light: #09DE6C;
+    --im-green-dark: #06AD56;
+    --im-bg: #EDEDED;
+    --im-bg-secondary: #F7F7F7;
+    --im-bg-chat: #EDEDED;
+    --im-surface: #FFFFFF;
+    --im-text: #181818;
+    --im-text-secondary: #888888;
+    --im-border: #E6E6E6;
+    --im-bubble-self: #95EC69;
+    --im-bubble-other: #FFFFFF;
+  }
+
+  .dark {
+    --im-bg: #111111;
+    --im-bg-secondary: #1A1A1A;
+    --im-bg-chat: #111111;
+    --im-surface: #1E1E1E;
+    --im-text: #E0E0E0;
+    --im-text-secondary: #888888;
+    --im-border: #2A2A2A;
+    --im-bubble-self: #2B5F2B;
+    --im-bubble-other: #2A2A2A;
+  }
+
+  html, body {
+    @apply m-0 p-0 font-sans antialiased;
+    background: var(--im-bg);
+    color: var(--im-text);
+  }
+
+  * {
+    border-color: var(--im-border);
+  }
+}
+
+@layer components {
+  .im-tab-bar {
+    @apply flex items-center justify-around bg-[var(--im-surface)] border-t border-[var(--im-border)] h-14;
+  }
+
+  .im-tab-item {
+    @apply flex flex-col items-center gap-0.5 py-1 px-4 text-[var(--im-text-secondary)] transition-colors cursor-pointer;
+  }
+
+  .im-tab-item.active {
+    @apply text-[var(--im-green)];
+  }
+
+  .im-session-item {
+    @apply flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors;
+  }
+
+  .im-session-item:hover {
+    @apply bg-[var(--im-bg-secondary)];
+  }
+
+  .im-session-item.active {
+    @apply bg-[var(--im-bg-secondary)];
+  }
+
+  .im-avatar {
+    @apply w-11 h-11 rounded-lg flex items-center justify-center text-sm font-semibold flex-shrink-0;
+  }
+
+  .im-bubble {
+    @apply max-w-[70%] px-3 py-2 text-sm whitespace-pre-wrap break-words relative;
+  }
+
+  .im-bubble-self {
+    background: var(--im-bubble-self);
+    @apply rounded-2xl rounded-br-sm;
+  }
+
+  .im-bubble-other {
+    background: var(--im-bubble-other);
+    @apply rounded-2xl rounded-bl-sm;
+  }
+
+  .im-unread-badge {
+    @apply min-w-[18px] h-[18px] px-1 bg-[var(--im-green)] text-white rounded-full text-[10px] flex items-center justify-center font-bold;
+  }
+
+  .im-input {
+    @apply w-full px-3 py-2 bg-[var(--im-surface)] border border-[var(--im-border)] rounded-lg text-sm outline-none focus:ring-1 focus:ring-[var(--im-green)] focus:border-transparent transition;
+  }
+
+  .im-btn-primary {
+    @apply px-6 py-2 bg-[var(--im-green)] hover:bg-[var(--im-green-dark)] text-white font-medium rounded-lg transition disabled:opacity-50;
+  }
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+.dark ::-webkit-scrollbar-thumb { background: #444; }

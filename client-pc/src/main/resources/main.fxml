@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.im.client.controller.MainController"
+            styleClass="main-root">
+
+    <!-- Left: Session List -->
+    <left>
+        <VBox styleClass="session-panel" prefWidth="280">
+            <HBox styleClass="session-header" alignment="CENTER_LEFT">
+                <padding>
+                    <Insets top="12" right="12" bottom="12" left="12"/>
+                </padding>
+                <Label text="Messages" styleClass="session-header-title"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button text="Logout" onAction="#onLogout" styleClass="logout-button"/>
+            </HBox>
+            <ListView fx:id="sessionListView" styleClass="session-list" VBox.vgrow="ALWAYS"/>
+        </VBox>
+    </left>
+
+    <!-- Center: Chat Area -->
+    <center>
+        <VBox styleClass="chat-panel">
+            <!-- Chat Header -->
+            <HBox styleClass="chat-header" alignment="CENTER_LEFT">
+                <padding>
+                    <Insets top="12" right="16" bottom="12" left="16"/>
+                </padding>
+                <Label fx:id="chatTargetLabel" text="Select a conversation" styleClass="chat-target-label"/>
+            </HBox>
+
+            <Separator/>
+
+            <!-- Message List -->
+            <ListView fx:id="messageListView" styleClass="message-list" VBox.vgrow="ALWAYS"/>
+
+            <Separator/>
+
+            <!-- Input Area -->
+            <HBox styleClass="input-area" alignment="CENTER_LEFT">
+                <padding>
+                    <Insets top="8" right="12" bottom="8" left="12"/>
+                </padding>
+                <TextArea fx:id="messageInput" styleClass="message-input"
+                          prefRowCount="3" wrapText="true"
+                          promptText="Type a message..."
+                          disable="true" HBox.hgrow="ALWAYS"/>
+                <Button fx:id="sendButton" text="Send" onAction="#onSend"
+                        styleClass="send-button" disable="true"/>
+            </HBox>
+        </VBox>
+    </center>
+</BorderPane>
