@@ -105,5 +105,8 @@ dependencies {
     // Serialization
     implementation("com.google.code.gson:gson:2.10.1")
 
+    // Firebase Cloud Messaging
+    implementation("com.google.firebase:firebase-messaging:23.4.1")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

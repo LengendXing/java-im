@@ -8,6 +8,8 @@ import com.im.server.push.FcmService;
 import com.im.server.push.PushServiceHolder;
 import com.im.server.registry.NacosRegistryService;
 import com.im.server.registry.NacosRegistryHolder;
+import com.im.server.registry.NacosConfigHolder;
+import com.im.server.registry.NacosConfigService;
 import com.im.server.storage.DatabaseService;
 import com.im.server.storage.RedisService;
 import io.vertx.core.DeploymentOptions;
@@ -104,6 +106,11 @@ public class Main {
                     NacosRegistryHolder.setInstance(nacos);
                     if (nacos.isEnabled()) {
                         nacos.register("0.0.0.0", serverConfig.getHttpPort(), "im");
+                        nacos.register("0.0.0.0", serverConfig.getTcpPort(), "im-gateway");
+
+                        NacosConfigService nacosConfig = new NacosConfigService();
+                        try { nacosConfig.init(serverConfig.getNacosServerAddr(), true, () -> log.info("Nacos config updated, restart required for full effect")); } catch (Exception e) { log.warn("Nacos config init failed: {}", e.getMessage()); }
+                        NacosConfigHolder.setInstance(nacosConfig);
                     }
 
                     return io.vertx.core.Future.succeededFuture();
@@ -143,6 +150,9 @@ public class Main {
                 .compose(id -> { log.info("PushVerticle deployed x2: {}", id); return io.vertx.core.Future.succeededFuture(); })
                 .compose(v -> vx.deployVerticle("com.im.server.logic.GroupPullVerticle", depOpts))
                 .compose(id -> { log.info("GroupPullVerticle deployed: {}", id); return io.vertx.core.Future.succeededFuture(); })
+                .compose(v -> vx.deployVerticle("com.im.server.e2ee.E2eeVerticle",
+                        new DeploymentOptions().setConfig(depOpts.getConfig()).setInstances(2)))
+                .compose(id -> { log.info("E2eeVerticle deployed x2: {}", id); return io.vertx.core.Future.succeededFuture(); })
                 .mapEmpty();
     }
 

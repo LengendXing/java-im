@@ -166,6 +166,8 @@ public class GatewayVerticle extends AbstractVerticle {
             case Cmd.MSG_ACK -> forwardToLogic("im.logic.SESSION", conn, packet);
             case Cmd.SYNC -> forwardToLogic("im.logic.SYNC", conn, packet);
             case Cmd.SESSION_LIST -> forwardToLogic("im.logic.SESSION", conn, packet);
+            case Cmd.KEY_BUNDLE_REQUEST -> forwardToLogic("im.logic.KEY_BUNDLE_REQUEST", conn, packet);
+            case Cmd.PUSH_TOKEN_REGISTER -> forwardToLogic("im.logic.PUSH_TOKEN_REGISTER", conn, packet);
             default -> log.warn("unknown cmd: 0x{}", Integer.toHexString(packet.getCmd()));
         }
     }
@@ -249,6 +251,8 @@ public class GatewayVerticle extends AbstractVerticle {
             case Cmd.GROUP_MSG -> Cmd.GROUP_MSG_ACK;
             case Cmd.SESSION_LIST -> Cmd.SESSION_LIST_ACK;
             case Cmd.SYNC -> Cmd.SYNC_ACK;
+            case Cmd.KEY_BUNDLE_REQUEST -> Cmd.KEY_BUNDLE_RESPONSE;
+            case Cmd.PUSH_TOKEN_REGISTER -> Cmd.PUSH_TOKEN_REGISTER_ACK;
             case Cmd.MSG_ACK -> 0;
             default -> 0;
         };

@@ -27,6 +27,9 @@ message MessageContent {
   string quote_text = 11;      // for quote: snippet of referenced message
   int64 quote_sender_id = 12;  // for quote: original sender
   int64 forward_from_session = 13; // for forward: source session
+  bytes encrypted_key = 14;        // E2EE: AES key encrypted with receiver's public key
+  bytes encrypted_content = 15;    // E2EE: message ciphertext
+  bool is_encrypted = 16;          // E2EE: whether this message is encrypted
 }
 
 // ===== Auth =====
@@ -194,6 +197,7 @@ message SessionInfo {
   bool is_top = 9;
   bool is_muted = 10;
   int64 last_read_seq = 11;
+  int32 diffusion_mode = 12; // 0=write diffusion 1=read diffusion
 }
 
 // ===== Friend =====
@@ -294,6 +298,39 @@ message FileUploadResponse {
 // ===== Generic Response =====
 
 message GenericResponse {
+  int32 code = 1;
+  string msg = 2;
+}
+
+// ===== E2EE Key Exchange =====
+
+message KeyBundleRequest {
+  int64 target_user_id = 1;
+}
+
+message KeyBundleResponse {
+  int32 code = 1;
+  string msg = 2;
+  bytes identity_key = 3;
+  bytes signed_prekey = 4;
+  bytes signed_prekey_signature = 5;
+  OneTimePreKey one_time_prekey = 6;
+}
+
+message OneTimePreKey {
+  int32 key_id = 1;
+  bytes public_key = 2;
+}
+
+// ===== Push Token =====
+
+message PushTokenRegisterRequest {
+  int32 platform = 1;  // 1=iOS 2=Android 3=Web
+  string token = 2;
+  string bundle_id = 3;
+}
+
+message PushTokenRegisterResponse {
   int32 code = 1;
   string msg = 2;
 }

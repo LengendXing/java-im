@@ -37,5 +37,9 @@ public final class Cmd {
     public static final int MSG_RECALL = 0x0121;
     public static final int MSG_RECALL_NOTIFY = 0x0122;
     public static final int FILE_UPLOAD = 0x0701;
+    public static final int KEY_BUNDLE_REQUEST = 0x0801;
+    public static final int KEY_BUNDLE_RESPONSE = 0x0802;
+    public static final int PUSH_TOKEN_REGISTER = 0x0803;
+    public static final int PUSH_TOKEN_REGISTER_ACK = 0x0804;
     public static final int KICKOFF = 0x0F01;
 }

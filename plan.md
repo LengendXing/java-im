@@ -63,3 +63,35 @@
 - [x] Gateway Nacos 注销（A4） ✅ 2026-05-26
 - [x] 推送死信飞书告警（B6） ✅ 2026-05-26
 - [x] 动态扩散模式切换+缓存失效（D5） ✅ 2026-05-26
+
+## Phase 5 — v0.4.1 P0 核心补全
+
+- [x] 协议扩展：Cmd 0x0801~0x0803 + E2EE Protobuf 字段 ✅ 2026-05-26
+- [x] E2eeVerticle：KEY_BUNDLE_REQUEST / PUSH_TOKEN_REGISTER ✅ 2026-05-26
+- [x] APNs pushy SDK 集成（E3） ✅ 2026-05-26
+- [x] FCM firebase-admin SDK 集成（E4） ✅ 2026-05-26
+- [x] 推送频率限制（Redis 滑动窗口）（E5） ✅ 2026-05-26
+- [x] Nacos 服务发现替代 Redis 路由（I4） ✅ 2026-05-26
+
+## Phase 6 — v0.4.1 P1 功能补全
+
+- [ ] 历史数据迁移工具（C3）
+- [ ] RNacos 配置中心热更新（I6）
+- [ ] RNacos 集群部署（I2）
+- [ ] README 集群部署指南（D2）
+- [ ] 安卓客户端 FCM 集成（E6）
+
+## Phase 7 — v0.4.1 P2/E2EE 客户端
+
+- [ ] E2EE 客户端 Double Ratchet + AES-256-GCM（F2-F4）
+- [ ] 基准测试报告（H2）
+- [ ] 瓶颈分析（H4）
+
+## 延后至 v0.5.0
+
+- [ ] 冷热分离（C5）
+- [ ] 群聊加密 Sender Keys（F5）
+- [ ] 密钥轮换（F6）
+- [ ] OpenTelemetry 分布式追踪（G5）
+- [ ] 自动化压测脚本（H5）
+- [ ] iOS APNs 客户端集成（E7）

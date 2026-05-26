@@ -211,3 +211,41 @@
 - Gateway 优雅下线 Nacos 注销
 - 推送死信飞书告警
 - 动态扩散模式双向切换 + 缓存一致性
+
+## v0.4.1 - 2026-05-26
+
+### 变更内容
+- E2eeVerticle: 处理 KEY_BUNDLE_REQUEST（拉取对方 PreKey Bundle）和 PUSH_TOKEN_REGISTER（注册推送 Token）
+- ApnsService: 集成 pushy 0.15.4 实际 SDK（APNs HTTP/2 推送）
+- FcmService: 集成 firebase-admin 9.4.0 实际 SDK（FCM 推送）
+- PushRateLimiter: Redis ZSET 滑动窗口限流（每分钟5条）
+- PushVerticle: Nacos 服务发现替代 Redis 路由表查找 Gateway 实例
+- Nacos 注册 im-gateway 服务（TCP端口），支持跨节点推送路由
+- GatewayVerticle: 新增 KEY_BUNDLE_REQUEST / PUSH_TOKEN_REGISTER 命令路由
+- Main: 部署 E2eeVerticle x2 实例
+- 协议扩展：MessageContent 新增 encrypted_key/encrypted_content/is_encrypted；SessionInfo 新增 diffusion_mode；新增 KeyBundle/OneTimePreKey/PushToken 消息类型
+
+### 功能列表
+- E2EE 密钥交换（X3DH PreKey Bundle 拉取）
+- 推送 Token 注册（APNs/FCM/Web）
+- APNs 实际推送（pushy SDK）
+- FCM 实际推送（firebase-admin SDK）
+- 推送频率限制（Redis 滑动窗口）
+- Nacos 服务发现替代 Redis 路由
+
+## v0.4.1-p1 - 2026-05-26
+
+### 变更内容
+- MigrationTool: 历史数据迁移工具，按 serverTime 迁移 im_message 到 im_message_{YYYYMM} 分表，支持 dry-run
+- NacosConfigService: RNacos 配置中心集成（dataId: im-server.yml），监听配置变更热更新
+- docker-compose: RNacos 3 节点 Raft 集群部署（node1:8848, node2:8849, node3:8850）
+- README: 新增集群部署指南（架构图 + Nacos 集群 + 数据迁移说明）
+- .env.example: 新增 Nacos 集群配置说明
+- 安卓端 FCM 集成: FcmService（FirebaseMessagingService）+ AndroidManifest 注册
+
+### 功能列表
+- 历史数据迁移（dry-run + 实际迁移）
+- Nacos 配置中心热更新
+- Nacos 3 节点 Raft 集群
+- 集群部署指南文档
+- 安卓 FCM 推送通知

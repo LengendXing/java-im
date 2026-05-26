@@ -251,12 +251,89 @@ java-im/
 
 | Layer | Technology |
 |-------|-----------|
-| Server | Vert.x 4.5.x, Protobuf, Redis, MySQL, JWT |
+| Server | Vert.x 4.5.x, Protobuf, Redis, MySQL, JWT, pushy, firebase-admin |
 | Web Client | Vue 3, TypeScript, Tailwind CSS, Pinia, vue-i18n |
 | Desktop Client | JavaFX 17, rxcontrols, OkHttp, Protobuf |
-| Android Client | Kotlin, Jetpack Compose, Material3, Room, OkHttp, DataStore, Coil |
+| Android Client | Kotlin, Jetpack Compose, Material3, Room, OkHttp, DataStore, Coil, FCM |
 | File Server | dufs (lightweight Rust file server) |
 | Deployment | Docker Compose, Nginx |
+| Service Registry | RNacos (standalone / 3-node Raft cluster) |
+| Message Queue | Folkmq (persistent delivery) |
+| Observability | Prometheus, Grafana, Loki |
+
+## Cluster Deployment
+
+### Architecture
+
+```
+                    ┌─────────────┐
+                    │   Nginx LB  │
+                    └──────┬──────┘
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+    ┌─────┴─────┐   ┌─────┴─────┐   ┌─────┴─────┐
+    │ im-server1│   │ im-server2│   │ im-server3│
+    │  Gateway  │   │  Gateway  │   │  Gateway  │
+    │  Logic×2  │   │  Logic×2  │   │  Logic×2  │
+    │  E2ee×2   │   │  E2ee×2   │   │  E2ee×2   │
+    │  Push×2   │   │  Push×2   │   │  Push×2   │
+    └─────┬─────┘   └─────┬─────┘   └─────┬─────┘
+          │                │                │
+    ┌─────┴────────────────┴────────────────┴─────┐
+    │            Hazelcast Cluster                │
+    └──────────────────┬──────────────────────────┘
+                       │
+    ┌──────────┬───────┴────────┬──────────┐
+    │  Redis   │     MySQL      │  Folkmq  │
+    └──────────┘                └──────────┘
+                       │
+    ┌──────────┬───────┴────────┐
+    │ Nacos-1  │  Nacos-2/3     │
+    │ (Raft)   │  (Raft)        │
+    └──────────┘                └──────────┘
+```
+
+### Quick Start (Cluster Mode)
+
+```bash
+# 1. Clone and configure
+git clone <repo-url> && cd java-im
+cp .env.example .env
+# Edit .env: set IM_NACOS_ENABLED=true, IM_CLUSTER_ENABLED=true
+
+# 2. Start all services (Nacos 3-node cluster + IM cluster)
+docker compose up -d
+
+# 3. Verify
+curl http://localhost:8080/api/health
+curl http://localhost:8848/nacos/   # Nacos console
+curl http://localhost:8849/nacos/   # Nacos node2
+```
+
+### Nacos Cluster
+
+3-node Raft cluster for service registry + config center:
+
+| Node | API Port | Console Port |
+|------|----------|-------------|
+| rnacos-node1 | 8848 | 10848 |
+| rnacos-node2 | 8849 | 10849 |
+| rnacos-node3 | 8850 | 10850 |
+
+Config center dataId: `im-server.yml`, group: `im`
+
+### Data Migration
+
+Migrate messages from `im_message` to monthly sharded tables:
+
+```bash
+# Dry-run (preview only)
+java -Dim_mysql_host=... -cp server/build/libs/server-all.jar com.im.server.storage.MigrationTool --dry-run
+
+# Actual migration
+java -Dim_mysql_host=... -cp server/build/libs/server-all.jar com.im.server.storage.MigrationTool
+```
 
 ## License
 

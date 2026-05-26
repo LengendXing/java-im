@@ -11,6 +11,8 @@ import com.im.server.push.FcmService;
 import com.im.server.push.PushServiceHolder;
 import com.im.server.push.PushRateLimiter;
 import com.im.server.common.DatabaseServiceHolder;
+import com.im.server.registry.NacosRegistryHolder;
+import com.im.server.registry.NacosRegistryService;
 import com.im.server.storage.DatabaseService;
 import com.im.server.storage.RedisService;
 import io.vertx.core.AbstractVerticle;
@@ -19,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 
 public class PushVerticle extends AbstractVerticle {
     private static final Logger log = LoggerFactory.getLogger(PushVerticle.class);
@@ -29,7 +32,6 @@ public class PushVerticle extends AbstractVerticle {
     public void start() {
         redisService = RedisServiceHolder.getInstance();
 
-        // Subscribe to Folkmq topics for persistent message delivery
         FolkmqService folkmq = FolkmqServiceHolder.getInstance();
         if (folkmq != null) {
             folkmq.subscribe("im-c2c", this::handleFolkmqMessage);
@@ -37,7 +39,6 @@ public class PushVerticle extends AbstractVerticle {
             log.info("PushVerticle subscribed to Folkmq topics im-c2c, im-group");
         }
 
-        // Keep EventBus consumer for backward compatibility and non-Folkmq pushes
         vertx.eventBus().consumer("im.logic.PUSH", msg -> {
             byte[] data = (byte[]) msg.body();
             handlePush(data);
@@ -60,10 +61,10 @@ public class PushVerticle extends AbstractVerticle {
             buf.putShort((short) Cmd.MAGIC);
             buf.putShort((short) Cmd.VERSION);
             buf.putShort((short) cmd);
-            buf.put((byte) 2); // NOTIFY
-            buf.putInt(0); // sequenceId
+            buf.put((byte) 2);
+            buf.putInt(0);
             buf.putInt(payload.length);
-            buf.put(new byte[7]); // padding
+            buf.put(new byte[7]);
             buf.put(payload);
 
             byte[] packetBytes = buf.array();
@@ -71,30 +72,46 @@ public class PushVerticle extends AbstractVerticle {
             redisService.getRoute(userId)
                     .onSuccess(gatewayId -> {
                         if (gatewayId != null) {
-                            Buffer pushBuf = Buffer.buffer();
-                            pushBuf.appendLong(userId);
-                            pushBuf.appendBytes(packetBytes);
-
-                            String address = "im.gateway." + gatewayId;
-                            vertx.eventBus().send(address, pushBuf.getBytes());
-
-                            log.debug("push to userId={}, cmd=0x{}, gateway={}", userId, Integer.toHexString(cmd), gatewayId);
+                            deliverToGateway(userId, packetBytes, gatewayId);
                         } else {
-                            log.debug("user {} offline, sending push notification", userId);
-                            sendOfflinePush(userId, cmd, payload);
+                            // Try Nacos service discovery as fallback
+                            NacosRegistryService nacos = NacosRegistryHolder.getInstance();
+                            if (nacos != null && nacos.isEnabled()) {
+                                List<String> instances = nacos.getGatewayInstances();
+                                if (!instances.isEmpty()) {
+                                    deliverToGateway(userId, packetBytes, "push");
+                                    log.debug("user {} offline, tried Nacos gateway discovery", userId);
+                                } else {
+                                    log.debug("user {} offline, no gateways in Nacos", userId);
+                                    sendOfflinePush(userId, cmd, payload);
+                                }
+                            } else {
+                                log.debug("user {} offline, sending push notification", userId);
+                                sendOfflinePush(userId, cmd, payload);
+                            }
                         }
                     })
                     .onFailure(err -> {
                         log.warn("route lookup failed for userId={}: {}", userId, err.getMessage());
-                        Buffer pushBuf = Buffer.buffer();
-                        pushBuf.appendLong(userId);
-                        pushBuf.appendBytes(packetBytes);
-                        vertx.eventBus().send("im.gateway.push", pushBuf.getBytes());
+                        deliverToGateway(userId, packetBytes, "push");
                     });
 
         } catch (Exception e) {
             log.error("push error: {}", e.getMessage());
         }
+    }
+
+    private void deliverToGateway(long userId, byte[] packetBytes, String gatewayId) {
+        Buffer pushBuf = Buffer.buffer();
+        pushBuf.appendLong(userId);
+        pushBuf.appendBytes(packetBytes);
+
+        if ("push".equals(gatewayId)) {
+            vertx.eventBus().send("im.gateway.push", pushBuf.getBytes());
+        } else {
+            vertx.eventBus().send("im.gateway." + gatewayId, pushBuf.getBytes());
+        }
+        log.debug("push to userId={}, cmd via gateway={}", userId, gatewayId);
     }
 
     private void sendOfflinePush(long userId, int cmd, byte[] payload) {
@@ -114,30 +131,26 @@ public class PushVerticle extends AbstractVerticle {
 
         boolean pushed = false;
         if (apns != null && apns.isEnabled()) {
-            var tokenFuture = db.getPushToken(userId, 1);
-            if (tokenFuture != null) {
-                tokenFuture.onSuccess(token -> {
-                    if (token != null) {
-                        apns.push(token, title, body, 1);
-                    } else {
-                        sendDeadLetterAlert(userId, cmd, "no_apns_token");
-                    }
-                }).onFailure(err -> sendDeadLetterAlert(userId, cmd, "apns_error:" + err.getMessage()));
-                pushed = true;
-            }
+            db.getPushToken(userId, 1)
+                    .onSuccess(token -> {
+                        if (token != null) {
+                            apns.push(token, title, body, 1);
+                        } else {
+                            sendDeadLetterAlert(userId, cmd, "no_apns_token");
+                        }
+                    }).onFailure(err -> sendDeadLetterAlert(userId, cmd, "apns_error:" + err.getMessage()));
+            pushed = true;
         }
         if (fcm != null && fcm.isEnabled()) {
-            var tokenFuture = db.getPushToken(userId, 2);
-            if (tokenFuture != null) {
-                tokenFuture.onSuccess(token -> {
-                    if (token != null) {
-                        fcm.push(token, title, body);
-                    } else {
-                        sendDeadLetterAlert(userId, cmd, "no_fcm_token");
-                    }
-                }).onFailure(err -> sendDeadLetterAlert(userId, cmd, "fcm_error:" + err.getMessage()));
-                pushed = true;
-            }
+            db.getPushToken(userId, 2)
+                    .onSuccess(token -> {
+                        if (token != null) {
+                            fcm.push(token, title, body);
+                        } else {
+                            sendDeadLetterAlert(userId, cmd, "no_fcm_token");
+                        }
+                    }).onFailure(err -> sendDeadLetterAlert(userId, cmd, "fcm_error:" + err.getMessage()));
+            pushed = true;
         }
         if (!pushed) {
             log.info("no push service enabled for userId={}, message queued for next online", userId);
