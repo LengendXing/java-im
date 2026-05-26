@@ -6,6 +6,8 @@ import com.im.client.data.remote.ApiService
 import com.im.client.data.remote.TcpConnection
 import com.im.client.data.repository.AuthRepository
 import com.im.client.data.repository.ChatRepository
+import com.im.client.data.repository.FriendRepository
+import com.im.client.data.repository.GroupRepository
 import com.im.client.data.repository.SessionRepository
 
 class App : Application() {
@@ -18,10 +20,16 @@ class App : Application() {
         AuthRepository(apiService, tcpConnection, database)
     }
     val chatRepository by lazy {
-        ChatRepository(tcpConnection, database)
+        ChatRepository(tcpConnection, database, apiService)
     }
     val sessionRepository by lazy {
         SessionRepository(apiService, tcpConnection, database)
+    }
+    val friendRepository by lazy {
+        FriendRepository(apiService)
+    }
+    val groupRepository by lazy {
+        GroupRepository(apiService)
     }
 
     override fun onCreate() {

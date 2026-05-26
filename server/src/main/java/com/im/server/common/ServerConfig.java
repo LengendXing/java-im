@@ -16,15 +16,25 @@ public class ServerConfig {
 
     public static ServerConfig fromJson(JsonObject json) {
         ServerConfig cfg = new ServerConfig();
-        cfg.tcpPort = json.getInteger("tcpPort", 8800);
-        cfg.wsPort = json.getInteger("wsPort", 8801);
-        cfg.httpPort = json.getInteger("httpPort", 8080);
+        cfg.tcpPort = Integer.parseInt(System.getProperty("IM_TCP_PORT",
+                String.valueOf(json.getInteger("tcpPort", 8800))));
+        cfg.wsPort = Integer.parseInt(System.getProperty("IM_WS_PORT",
+                String.valueOf(json.getInteger("wsPort", 8801))));
+        cfg.httpPort = Integer.parseInt(System.getProperty("IM_HTTP_PORT",
+                String.valueOf(json.getInteger("httpPort", 8080))));
         cfg.redis = json.getJsonObject("redis", new JsonObject()
-                .put("host", "127.0.0.1").put("port", 6379).put("password", "").put("database", 0));
+                .put("host", System.getProperty("IM_REDIS_HOST", "127.0.0.1"))
+                .put("port", Integer.parseInt(System.getProperty("IM_REDIS_PORT", "6379")))
+                .put("password", System.getProperty("IM_REDIS_PASSWORD", ""))
+                .put("database", Integer.parseInt(System.getProperty("IM_REDIS_DATABASE", "0"))));
         cfg.mysql = json.getJsonObject("mysql", new JsonObject()
-                .put("host", "127.0.0.1").put("port", 3306)
-                .put("database", "java_im").put("user", "root").put("password", "root"));
-        cfg.jwtSecret = json.getString("jwtSecret", "change-me-in-production");
+                .put("host", System.getProperty("IM_MYSQL_HOST", "127.0.0.1"))
+                .put("port", Integer.parseInt(System.getProperty("IM_MYSQL_PORT", "3306")))
+                .put("database", System.getProperty("IM_MYSQL_DB", "im_db"))
+                .put("user", System.getProperty("IM_MYSQL_USER", "root"))
+                .put("password", System.getProperty("IM_MYSQL_PASSWORD", "root")));
+        cfg.jwtSecret = System.getProperty("IM_JWT_SECRET",
+                json.getString("jwtSecret", "change-me-in-production"));
         cfg.jwtTtlDays = json.getInteger("jwtTtlDays", 7);
         cfg.workerId = json.getLong("workerId", 1L);
         cfg.heartbeatInterval = json.getLong("heartbeatInterval", 30000L);

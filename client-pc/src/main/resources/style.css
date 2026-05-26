@@ -241,3 +241,96 @@
 .logo-circle {
     -fx-fill: -im-green;
 }
+
+/* ===== Icon / Toolbar Buttons ===== */
+.icon-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -im-green;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-background-radius: 4;
+}
+
+.icon-button:hover {
+    -fx-background-color: #E8E8E8;
+}
+
+.toolbar-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -im-green;
+    -fx-font-size: 12px;
+    -fx-padding: 4 10;
+    -fx-background-radius: 4;
+    -fx-border-color: -im-green;
+    -fx-border-radius: 4;
+    -fx-cursor: hand;
+}
+
+.toolbar-button:hover {
+    -fx-background-color: #E8F8EE;
+}
+
+.toolbar-button-danger {
+    -fx-background-color: transparent;
+    -fx-text-fill: -im-error;
+    -fx-font-size: 12px;
+    -fx-padding: 4 10;
+    -fx-background-radius: 4;
+    -fx-border-color: -im-error;
+    -fx-border-radius: 4;
+    -fx-cursor: hand;
+}
+
+.toolbar-button-danger:hover {
+    -fx-background-color: #FDE8E8;
+}
+
+/* ===== File Upload Button ===== */
+.file-upload-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -im-green;
+    -fx-font-size: 18px;
+    -fx-padding: 4 8;
+    -fx-cursor: hand;
+    -fx-background-radius: 4;
+}
+
+.file-upload-button:hover {
+    -fx-background-color: #E8E8E8;
+}
+
+.file-upload-button:disabled {
+    -fx-text-fill: #C0C0C0;
+    -fx-cursor: default;
+}
+
+/* ===== Tab Pane ===== */
+.tab-pane {
+    -fx-border-color: transparent;
+}
+
+.tab-pane .tab-header-area {
+    -fx-padding: 0;
+}
+
+.tab-pane .tab {
+    -fx-background-color: -im-surface;
+    -fx-border-color: -im-border;
+    -fx-border-width: 0 0 1 0;
+}
+
+.tab-pane .tab:selected {
+    -fx-border-color: -im-green;
+    -fx-border-width: 0 0 2 0;
+}
+
+.tab-pane .tab-label {
+    -fx-text-fill: -im-text;
+    -fx-font-size: 13px;
+}
+
+.tab-pane .tab:selected .tab-label {
+    -fx-text-fill: -im-green;
+    -fx-font-weight: bold;
+}

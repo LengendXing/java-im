@@ -76,6 +76,24 @@ public class AuthVerticle extends AbstractVerticle {
             handleFriendList(msg, req);
         });
 
+        // Handle friend accept
+        vertx.eventBus().consumer("im.logic.FRIEND_ACCEPT", msg -> {
+            JsonObject req = (JsonObject) msg.body();
+            handleFriendAccept(msg, req);
+        });
+
+        // Handle friend reject
+        vertx.eventBus().consumer("im.logic.FRIEND_REJECT", msg -> {
+            JsonObject req = (JsonObject) msg.body();
+            handleFriendReject(msg, req);
+        });
+
+        // Handle friend request list
+        vertx.eventBus().consumer("im.logic.FRIEND_REQUEST_LIST", msg -> {
+            JsonObject req = (JsonObject) msg.body();
+            handleFriendRequestList(msg, req);
+        });
+
         log.info("AuthVerticle started");
     }
 
@@ -245,6 +263,54 @@ public class AuthVerticle extends AbstractVerticle {
                                 .put("avatarUrl", u.getAvatarUrl()));
                     }
                     msg.reply(new JsonObject().put("code", 0).put("msg", "ok").put("friends", arr));
+                })
+                .onFailure(err -> msg.reply(new JsonObject().put("code", 1).put("msg", "db error")));
+    }
+
+    private void handleFriendAccept(io.vertx.core.eventbus.Message<Object> msg, JsonObject req) {
+        long userId = req.getLong("userId", -1L); // the one accepting
+        long fromUserId = req.getLong("fromUserId", -1L); // the one who sent the request
+        if (userId <= 0 || fromUserId <= 0) {
+            msg.reply(new JsonObject().put("code", 1003).put("msg", "invalid params"));
+            return;
+        }
+        dbService.acceptFriendRequest(fromUserId, userId)
+                .onSuccess(v -> {
+                    msg.reply(new JsonObject().put("code", 0).put("msg", "ok"));
+                    log.info("friend accepted: {} <-> {}", fromUserId, userId);
+                })
+                .onFailure(err -> msg.reply(new JsonObject().put("code", 1).put("msg", "accept failed")));
+    }
+
+    private void handleFriendReject(io.vertx.core.eventbus.Message<Object> msg, JsonObject req) {
+        long userId = req.getLong("userId", -1L);
+        long fromUserId = req.getLong("fromUserId", -1L);
+        if (userId <= 0 || fromUserId <= 0) {
+            msg.reply(new JsonObject().put("code", 1003).put("msg", "invalid params"));
+            return;
+        }
+        dbService.rejectFriendRequest(fromUserId, userId)
+                .onSuccess(v -> msg.reply(new JsonObject().put("code", 0).put("msg", "ok")))
+                .onFailure(err -> msg.reply(new JsonObject().put("code", 1).put("msg", "reject failed")));
+    }
+
+    private void handleFriendRequestList(io.vertx.core.eventbus.Message<Object> msg, JsonObject req) {
+        long userId = req.getLong("userId", -1L);
+        if (userId <= 0) {
+            msg.reply(new JsonObject().put("code", 1003).put("msg", "invalid userId"));
+            return;
+        }
+        dbService.getPendingFriendRequests(userId)
+                .onSuccess(users -> {
+                    io.vertx.core.json.JsonArray arr = new io.vertx.core.json.JsonArray();
+                    for (var u : users) {
+                        arr.add(new JsonObject()
+                                .put("userId", u.getUserId())
+                                .put("username", u.getUsername())
+                                .put("nickname", u.getNickname())
+                                .put("avatarUrl", u.getAvatarUrl()));
+                    }
+                    msg.reply(new JsonObject().put("code", 0).put("msg", "ok").put("requests", arr));
                 })
                 .onFailure(err -> msg.reply(new JsonObject().put("code", 1).put("msg", "db error")));
     }

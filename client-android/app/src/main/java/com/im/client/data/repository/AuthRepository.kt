@@ -1,6 +1,7 @@
 package com.im.client.data.repository
 
 import android.content.Context
+import android.net.Uri
 import android.provider.Settings
 import android.util.Log
 import androidx.datastore.core.DataStore
@@ -93,11 +94,17 @@ class AuthRepository(
         return token
     }
 
+    suspend fun getUserId(context: Context): Long? {
+        var userId: Long? = null
+        context.dataStore.edit { prefs -> userId = prefs[KEY_USER_ID] }
+        return userId
+    }
+
     fun getUserFlow(context: Context): Flow<User?> {
         return context.dataStore.data.map { prefs ->
-            val userId = prefs[KEY_USER_ID] ?: return@map null
+            val uid = prefs[KEY_USER_ID] ?: return@map null
             User(
-                userId = userId,
+                userId = uid,
                 username = prefs[KEY_USERNAME] ?: "",
                 nickname = prefs[KEY_NICKNAME] ?: "",
                 avatarUrl = prefs[KEY_AVATAR_URL] ?: ""
@@ -124,9 +131,7 @@ class AuthRepository(
             context.contentResolver, Settings.Secure.ANDROID_ID
         ) ?: "unknown"
         tcpConnection.connect()
-        // Authentication will be sent once connection state becomes CONNECTED
-        // via observing connectionState flow. Simplified here:
-        tcpConnection.authenticate(token, deviceId, 2) // platform=2 for Android
+        tcpConnection.authenticate(token, deviceId, 2)
     }
 
     suspend fun logout(context: Context) {

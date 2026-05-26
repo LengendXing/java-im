@@ -4,27 +4,22 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.im.client.data.model.Session
+import com.im.client.ui.contacts.FriendRequestsScreen
+import com.im.client.ui.contacts.FriendRequestsViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -32,43 +27,89 @@ import java.util.*
 @Composable
 fun SessionListScreen(
     onSessionClick: (String) -> Unit,
+    onNavigateToGroupCreate: () -> Unit = {},
     viewModel: SessionListViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val sessions by viewModel.sessions.collectAsState()
+    val selectedTab by viewModel.selectedTab
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Messages") },
+                actions = {
+                    if (selectedTab == 1) {
+                        IconButton(onClick = onNavigateToGroupCreate) {
+                            Icon(Icons.Default.Add, contentDescription = "Create Group")
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
     ) { padding ->
-        if (sessions.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("No conversations yet", style = MaterialTheme.typography.bodyLarge)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Pull to refresh", style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            // Tab row: Sessions | Contacts
+            TabRow(selectedTabIndex = selectedTab) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { viewModel.selectTab(0) },
+                    text = { Text("Sessions") }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { viewModel.selectTab(1) },
+                    text = { Text("Requests") }
+                )
             }
-        } else {
-            PullToRefreshBox(
-                isRefreshing = viewModel.isRefreshing,
-                onRefresh = { viewModel.refresh() },
-                modifier = Modifier.fillMaxSize().padding(padding)
-            ) {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(sessions, key = { it.sessionId }) { session ->
-                        SessionItem(session = session, onClick = { onSessionClick(session.sessionId) })
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    }
+
+            when (selectedTab) {
+                0 -> SessionListContent(
+                    sessions = sessions,
+                    isRefreshing = viewModel.isRefreshing,
+                    onRefresh = { viewModel.refresh() },
+                    onSessionClick = onSessionClick
+                )
+                1 -> FriendRequestsScreen(
+                    viewModel = androidx.lifecycle.viewmodel.compose.viewModel<FriendRequestsViewModel>()
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SessionListContent(
+    sessions: List<Session>,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    onSessionClick: (String) -> Unit
+) {
+    if (sessions.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("No conversations yet", style = MaterialTheme.typography.bodyLarge)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Pull to refresh", style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    } else {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(sessions, key = { it.sessionId }) { session ->
+                    SessionItem(session = session, onClick = { onSessionClick(session.sessionId) })
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
         }
@@ -84,7 +125,6 @@ fun SessionItem(session: Session, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar placeholder
         Surface(
             modifier = Modifier.size(48.dp),
             shape = MaterialTheme.shapes.medium,

@@ -7,7 +7,7 @@
             fx:controller="com.im.client.controller.MainController"
             styleClass="main-root">
 
-    <!-- Left: Session List -->
+    <!-- Left: Session Panel -->
     <left>
         <VBox styleClass="session-panel" prefWidth="280">
             <HBox styleClass="session-header" alignment="CENTER_LEFT">
@@ -16,9 +16,18 @@
                 </padding>
                 <Label text="Messages" styleClass="session-header-title"/>
                 <Region HBox.hgrow="ALWAYS"/>
+                <Button text="+" onAction="#onCreateGroup" styleClass="icon-button"
+                        prefWidth="30" prefHeight="30"/>
                 <Button text="Logout" onAction="#onLogout" styleClass="logout-button"/>
             </HBox>
-            <ListView fx:id="sessionListView" styleClass="session-list" VBox.vgrow="ALWAYS"/>
+            <TabPane tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
+                <Tab text="Sessions">
+                    <ListView fx:id="sessionListView" styleClass="session-list" VBox.vgrow="ALWAYS"/>
+                </Tab>
+                <Tab text="Requests" onSelectionChanged="#onFriendRequestsTabChanged">
+                    <ListView fx:id="friendRequestListView" styleClass="session-list" VBox.vgrow="ALWAYS"/>
+                </Tab>
+            </TabPane>
         </VBox>
     </left>
 
@@ -31,6 +40,13 @@
                     <Insets top="12" right="16" bottom="12" left="16"/>
                 </padding>
                 <Label fx:id="chatTargetLabel" text="Select a conversation" styleClass="chat-target-label"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button fx:id="groupInviteButton" text="Invite" onAction="#onGroupInvite"
+                        styleClass="toolbar-button" visible="false"/>
+                <Button fx:id="groupKickButton" text="Kick" onAction="#onGroupKick"
+                        styleClass="toolbar-button" visible="false"/>
+                <Button fx:id="groupDissolveButton" text="Dissolve" onAction="#onGroupDissolve"
+                        styleClass="toolbar-button-danger" visible="false"/>
             </HBox>
 
             <Separator/>
@@ -45,6 +61,8 @@
                 <padding>
                     <Insets top="8" right="12" bottom="8" left="12"/>
                 </padding>
+                <Button fx:id="fileUploadButton" text="&#128206;" onAction="#onFileUpload"
+                        styleClass="file-upload-button" disable="true"/>
                 <TextArea fx:id="messageInput" styleClass="message-input"
                           prefRowCount="3" wrapText="true"
                           promptText="Type a message..."

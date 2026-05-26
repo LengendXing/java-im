@@ -49,26 +49,71 @@
 - 心跳保活 + 在线路由自动续期
 - 多端 WebSocket 支持（CORS）
 - WeChat 风格 Web UI
-## v0.1.2 - 2026-05-26
+
+## v0.2.0 - 2026-05-26
 
 ### 变更内容
-- 桌面客户端 WeChat 风格 UI 重构：绿色主色调(#07C160)、白底界面、绿色气泡(#95EC69)
-- 桌面客户端集成 rxcontrols 库、登录/注册页添加 WeChat 绿色 "W" Logo
-- 移除重复的 ImConnection.java（保留 TcpConnection.java 作为唯一连接实现）
-- MessageModel.sentByMe 改为 BooleanProperty（与其他 JavaFX Property 字段一致）
-- App.stop() 改为优雅断开 TCP 连接而非 System.exit(0)
-- 安卓客户端 WeChat 绿色主题重构：Color.kt/Theme.kt 使用 #07C160 主色调
-- 安卓客户端 TcpConnection readLoop 从 O(n²) mutableListOf<Byte> 重写为高效 readFully 直读
-- 安卓客户端 LoginScreen 添加 WeChat "W" Logo、ChatScreen 使用 #95EC69 绿色气泡
+- Protobuf 协议扩展：新增 FriendAccept/Reject/RequestList、GroupInvite/Kick/Dissolve、MsgRead/Recall/RecallNotify、FileUpload、MsgSearch、quote/forward 字段
+- 服务端新增：好友接受/拒绝/请求列表、群组邀请/踢出/解散、消息撤回(2分钟)、消息已读状态、消息搜索、文件上传(dufs)
+- DatabaseService 新增方法：acceptFriendRequest、rejectFriendRequest、getPendingFriendRequests、removeGroupMember、dissolveGroup、isGroupOwner、recallMessage、getMessageById、updateLastReadSeq、searchMessages
+- 数据库 schema 新增：im_session.last_read_seq、im_message.is_recalled
+- ServerConfig 支持环境变量配置（Docker 部署）
+- HttpApiVerticle 新增所有 Phase2 API 端点 + /metrics Prometheus 端点
+- Docker 部署：dufs 替代 MinIO、server Dockerfile、web Dockerfile + Nginx 反向代理、healthcheck
+- 客户端三端同步更新 Phase2 功能
 
 ### 影响范围
-- 桌面端：style.css、LoginController、RegisterController、MainController、login.fxml、register.fxml、MessageModel、App
-- 安卓端：Color.kt、Theme.kt、TcpConnection、LoginScreen、ChatScreen
+- 全模块：protocol、server、client-web、client-pc、client-android
 
 ### 功能列表
-- 桌面端 WeChat 风格完整 UI（登录/注册/聊天/会话列表）
-- 安卓端 WeChat 风格完整 UI（登录/注册/会话/聊天）
-- 安卓端前台服务（ImService）+ 消息通知（NotificationHelper）
-- 安卓端 Room 本地存储（MessageEntity + SessionEntity）
-- 安卓端 DataStore 持久化 JWT Token
-- 安卓端协程化 TCP 连接 + 自动重连 + 心跳
+- 用户注册/登录（JWT Token + HTTP 鉴权）
+- 单聊文字/图片/文件/语音消息收发
+- 群聊文字/图片/文件/语音消息收发
+- 离线消息同步
+- 会话列表 + 未读计数 + 已读状态
+- 心跳保活 + 在线路由自动续期
+- 多端 WebSocket 支持（CORS）
+- 好友系统（申请/接受/拒绝/列表/请求列表）
+- 群组管理（创建/邀请/踢出/解散）
+- 消息撤回（2分钟内）
+- 文件上传下载（dufs）
+- 消息搜索
+- 消息引用/转发（协议支持）
+- Prometheus /metrics 监控
+- Docker Compose 一键部署（含 dufs）
+- WeChat 风格多端 UI（#07C160 绿色主色调）
+
+## v0.3.0 - 2026-05-26
+
+### 变更内容
+- Docker Compose 部署方案完善：dufs 替代 MinIO、server/web Dockerfile 多阶段构建、nginx 反向代理、healthcheck
+- ServerConfig 全面支持环境变量配置（Docker 友好）
+- HttpApiVerticle 新增 Prometheus /metrics 端点
+- 桌面客户端 Phase2 全功能：文件上传(FileUploadService)、好友请求(FriendService)、群组管理(GroupService)、消息撤回/已读(MessageService)、图片/文件消息内联渲染
+- 桌面客户端 main.fxml 添加 TabPane(会话+请求)、群管理按钮、上传按钮
+- Web 客户端 Phase2 全功能：文件/图片上传、好友请求接受/拒绝、群组邀请/踢出/解散、消息撤回、消息搜索、图片预览覆盖层
+- 安卓客户端 Phase2 全功能：文件/图片上传、好友请求(FriendRequestsScreen)、群组创建(GroupCreateScreen)、消息撤回、搜索、Tab导航(会话+请求)
+- 安卓客户端 ApiService 添加 11 个 HTTP API 方法、ChatRepository/SessionRepository 扩展、Room DB v2
+
+### 影响范围
+- 全模块：protocol、server、client-web、client-pc、client-android
+
+### 功能列表
+- 用户注册/登录（JWT Token + HTTP 鉴权）
+- 单聊文字/图片/文件/语音消息收发
+- 群聊文字/图片/文件/语音消息收发
+- 离线消息同步
+- 会话列表 + 未读计数 + 已读状态
+- 心跳保活 + 在线路由自动续期
+- 多端 WebSocket 支持（CORS）
+- 好友系统（申请/接受/拒绝/列表/请求列表）
+- 群组管理（创建/邀请/踢出/解散）
+- 消息撤回（2分钟内）
+- 文件上传下载（dufs）
+- 消息搜索
+- 消息引用/转发（协议支持）
+- @成员功能（协议支持）
+- 语音消息（协议支持）
+- Prometheus /metrics 监控
+- Docker Compose 一键部署（含 dufs + nginx）
+- WeChat 风格多端 UI（#07C160 绿色主色调）

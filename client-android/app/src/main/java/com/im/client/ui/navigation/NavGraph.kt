@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.im.client.ui.chat.ChatScreen
+import com.im.client.ui.group.GroupCreateScreen
 import com.im.client.ui.login.LoginScreen
 import com.im.client.ui.register.RegisterScreen
 import com.im.client.ui.sessions.SessionListScreen
@@ -33,7 +34,8 @@ fun ImNavGraph() {
         }
         composable(Routes.SESSIONS) {
             SessionListScreen(
-                onSessionClick = { sessionId -> navController.navigate(Routes.chat(sessionId)) }
+                onSessionClick = { sessionId -> navController.navigate(Routes.chat(sessionId)) },
+                onNavigateToGroupCreate = { navController.navigate(Routes.GROUP_CREATE) }
             )
         }
         composable(
@@ -43,6 +45,11 @@ fun ImNavGraph() {
             val sessionId = backStackEntry.arguments?.getString("sessionId") ?: ""
             ChatScreen(
                 sessionId = sessionId,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(Routes.GROUP_CREATE) {
+            GroupCreateScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

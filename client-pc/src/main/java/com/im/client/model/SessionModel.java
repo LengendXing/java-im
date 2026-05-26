@@ -16,6 +16,7 @@ public class SessionModel {
     private final IntegerProperty unreadCount = new SimpleIntegerProperty();
     private final BooleanProperty isTop = new SimpleBooleanProperty();
     private final BooleanProperty isMuted = new SimpleBooleanProperty();
+    private final LongProperty lastReadSeq = new SimpleLongProperty();
     private final ObservableList<MessageModel> messages = FXCollections.observableArrayList();
 
     public SessionModel() {
@@ -62,4 +63,8 @@ public class SessionModel {
     public BooleanProperty isMutedProperty() { return isMuted; }
 
     public ObservableList<MessageModel> getMessages() { return messages; }
+
+    public long getLastReadSeq() { return lastReadSeq.get(); }
+    public void setLastReadSeq(long value) { lastReadSeq.set(value); }
+    public LongProperty lastReadSeqProperty() { return lastReadSeq; }
 }

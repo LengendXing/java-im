@@ -14,7 +14,8 @@ data class MessageEntity(
     @ColumnInfo(name = "server_time") val serverTime: Long,
     @ColumnInfo(name = "client_msg_id") val clientMsgId: String = "",
     @ColumnInfo(name = "is_read") val isRead: Boolean = false,
-    @ColumnInfo(name = "is_mine") val isMine: Boolean = false
+    @ColumnInfo(name = "is_mine") val isMine: Boolean = false,
+    @ColumnInfo(name = "is_recalled") val isRecalled: Boolean = false
 )
 
 @Dao
@@ -42,6 +43,18 @@ interface MessageDao {
 
     @Query("SELECT COUNT(*) FROM message WHERE session_id = :sessionId AND is_read = 0 AND is_mine = 0")
     suspend fun getUnreadCount(sessionId: String): Int
+
+    @Query("SELECT MAX(seq) FROM message WHERE session_id = :sessionId")
+    suspend fun getLastSeq(sessionId: String): Long?
+
+    @Query("UPDATE message SET is_recalled = 1 WHERE msg_id = :msgId")
+    suspend fun markRecalled(msgId: Long)
+
+    @Query("SELECT * FROM message WHERE session_id = :sessionId AND content LIKE :keywordPattern ORDER BY seq ASC")
+    fun searchBySessionFlow(sessionId: String, keywordPattern: String): Flow<List<MessageEntity>>
+
+    @Query("DELETE FROM message WHERE msg_id = :msgId")
+    suspend fun deleteById(msgId: Long)
 }
 
 @Entity(tableName = "session", indices = [Index(value = ["session_id"], unique = true)])

@@ -4,7 +4,7 @@ package im.protocol;
 option java_package = "com.im.protocol";
 option java_outer_classname = "ImProto";
 
-// ===== 基础类型 =====
+// ===== Basic Types =====
 
 message UserInfo {
   int64 user_id = 1;
@@ -14,7 +14,7 @@ message UserInfo {
 }
 
 message MessageContent {
-  int32 msg_type = 1;
+  int32 msg_type = 1;  // 1=text 2=image 3=file 4=voice 5=system 6=recall 7=forward 8=quote
   string text = 2;
   string url = 3;
   string file_name = 4;
@@ -23,9 +23,13 @@ message MessageContent {
   int32 height = 7;
   int32 duration = 8;
   string extra = 9;
+  int64 quote_msg_id = 10;     // for quote: referenced message ID
+  string quote_text = 11;      // for quote: snippet of referenced message
+  int64 quote_sender_id = 12;  // for quote: original sender
+  int64 forward_from_session = 13; // for forward: source session
 }
 
-// ===== 认证 =====
+// ===== Auth =====
 
 message AuthRequest {
   string token = 1;
@@ -40,7 +44,7 @@ message AuthResponse {
   int64 server_time = 4;
 }
 
-// ===== 心跳 =====
+// ===== Heartbeat =====
 
 message HeartbeatRequest {}
 
@@ -48,7 +52,7 @@ message HeartbeatResponse {
   int64 server_time = 1;
 }
 
-// ===== 单聊 =====
+// ===== C2C Chat =====
 
 message C2CMsgRequest {
   int64 receiver_id = 1;
@@ -73,7 +77,7 @@ message C2CMsgNotify {
   int64 server_time = 6;
 }
 
-// ===== 群聊 =====
+// ===== Group Chat =====
 
 message GroupMsgRequest {
   int64 group_id = 1;
@@ -101,7 +105,7 @@ message GroupMsgNotify {
   int64 server_time = 8;
 }
 
-// ===== 消息确认 =====
+// ===== Message Ack =====
 
 message MsgAckRequest {
   int64 msg_id = 1;
@@ -109,7 +113,34 @@ message MsgAckRequest {
   int64 seq = 3;
 }
 
-// ===== 离线同步 =====
+// ===== Message Read =====
+
+message MsgReadRequest {
+  string session_id = 1;
+  int64 last_read_seq = 2;
+}
+
+message MsgReadNotify {
+  int64 user_id = 1;
+  string session_id = 2;
+  int64 last_read_seq = 3;
+}
+
+// ===== Message Recall =====
+
+message MsgRecallRequest {
+  int64 msg_id = 1;
+  string session_id = 2;
+}
+
+message MsgRecallNotify {
+  int64 msg_id = 1;
+  string session_id = 2;
+  int64 operator_id = 3;
+  int64 server_time = 4;
+}
+
+// ===== Offline Sync =====
 
 message SyncRequest {
   repeated SyncPoint points = 1;
@@ -137,9 +168,10 @@ message Message {
   int64 seq = 3;
   MessageContent content = 4;
   int64 server_time = 5;
+  bool is_recalled = 6;
 }
 
-// ===== 会话 =====
+// ===== Session =====
 
 message SessionListRequest {
   int64 last_update_time = 1;
@@ -161,13 +193,28 @@ message SessionInfo {
   int32 unread_count = 8;
   bool is_top = 9;
   bool is_muted = 10;
+  int64 last_read_seq = 11;
 }
 
-// ===== 好友 =====
+// ===== Friend =====
 
 message FriendApplyRequest {
   int64 target_user_id = 1;
   string message = 2;
+}
+
+message FriendApplyNotify {
+  int64 from_user_id = 1;
+  string from_nickname = 2;
+  string message = 3;
+}
+
+message FriendAcceptRequest {
+  int64 from_user_id = 1;
+}
+
+message FriendRejectRequest {
+  int64 from_user_id = 1;
 }
 
 message FriendListRequest {
@@ -179,11 +226,43 @@ message FriendListResponse {
   repeated UserInfo friends = 1;
 }
 
-// ===== 群组 =====
+message FriendRequestListResponse {
+  repeated FriendRequestInfo requests = 1;
+}
+
+message FriendRequestInfo {
+  int64 from_user_id = 1;
+  string from_nickname = 2;
+  string from_avatar_url = 3;
+  string message = 4;
+  int64 created_at = 5;
+}
+
+// ===== Group =====
 
 message GroupCreateRequest {
   string name = 1;
   repeated int64 member_ids = 2;
+}
+
+message GroupCreateResponse {
+  int32 code = 1;
+  string msg = 2;
+  int64 group_id = 3;
+}
+
+message GroupInviteRequest {
+  int64 group_id = 1;
+  repeated int64 user_ids = 2;
+}
+
+message GroupKickRequest {
+  int64 group_id = 1;
+  repeated int64 user_ids = 2;
+}
+
+message GroupDissolveRequest {
+  int64 group_id = 1;
 }
 
 message GroupMemberListRequest {
@@ -199,10 +278,20 @@ message GroupMemberListResponse {
 message GroupMember {
   UserInfo user_info = 1;
   int32 role = 2;
-  string joined_at = 3;
+  int64 joined_at = 3;
 }
 
-// ===== 通用响应 =====
+// ===== File Upload =====
+
+message FileUploadResponse {
+  int32 code = 1;
+  string msg = 2;
+  string url = 3;
+  string file_name = 4;
+  int64 file_size = 5;
+}
+
+// ===== Generic Response =====
 
 message GenericResponse {
   int32 code = 1;

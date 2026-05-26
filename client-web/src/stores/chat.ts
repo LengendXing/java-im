@@ -1,15 +1,18 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { wsService } from '../services/websocket'
-import { Cmd, MsgType } from '../proto/constants'
+import { Cmd, MsgType, ContentType } from '../proto/constants'
 import { decodeJsonBody } from '../proto/im'
-import type { SessionInfo, C2CMsgNotify, GroupMsgNotify, Message, SyncPoint } from '../proto/im'
+import type { SessionInfo, C2CMsgNotify, GroupMsgNotify, Message, MessageContent, SyncPoint } from '../proto/im'
 import { useAuthStore } from './auth'
+import * as api from '../services/api'
 
 export const useChatStore = defineStore('chat', () => {
   const sessions = ref<SessionInfo[]>([])
   const currentSessionId = ref('')
   const messages = ref<Map<string, Message[]>>(new Map())
+  const searchResults = ref<Array<{ msgId: number; sessionId: string; content: MessageContent; senderId: number; serverTime: number }>>([])
+  const isSearching = ref(false)
 
   const currentMessages = computed(() => messages.value.get(currentSessionId.value) || [])
   const currentSession = computed(() => sessions.value.find(s => s.sessionId === currentSessionId.value))
@@ -66,7 +69,13 @@ export const useChatStore = defineStore('chat', () => {
   function updateSession(sessionId: string, msg: Message) {
     const s = sessions.value.find(s => s.sessionId === sessionId)
     if (s) {
-      s.lastMsg = msg.content?.text?.substring(0, 50) || ''
+      const content = msg.content
+      if (content) {
+        if (content.msgType === ContentType.IMAGE) s.lastMsg = '[Image]'
+        else if (content.msgType === ContentType.FILE) s.lastMsg = '[File]'
+        else if (content.msgType === ContentType.SYSTEM) s.lastMsg = content.text
+        else s.lastMsg = content.text?.substring(0, 50) || ''
+      }
       s.lastMsgTime = msg.serverTime
       s.unreadCount++
       // Move to top
@@ -89,6 +98,17 @@ export const useChatStore = defineStore('chat', () => {
     if (!messages.value.has(sessionId) || messages.value.get(sessionId)!.length === 0) {
       requestSync([{ sessionId, lastSeq: 0 }])
     }
+    // Mark messages as read
+    markAsRead(sessionId)
+  }
+
+  function markAsRead(sessionId: string) {
+    const list = messages.value.get(sessionId)
+    if (!list || list.length === 0) return
+    const lastSeq = list[list.length - 1].seq
+    if (lastSeq > 0) {
+      api.markMessagesRead(sessionId, lastSeq).catch(() => {})
+    }
   }
 
   function sendC2CMessage(receiverId: number, text: string) {
@@ -97,10 +117,10 @@ export const useChatStore = defineStore('chat', () => {
     const clientMsgId = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`
 
     // Optimistic add
-    const optimistic: Message = { msgId: -Date.now(), senderId: auth.userId, seq: 0, content: { msgType: 1, text, url: '', fileName: '', fileSize: 0, width: 0, height: 0, duration: 0, extra: '' }, serverTime: Date.now() }
+    const optimistic: Message = { msgId: -Date.now(), senderId: auth.userId, seq: 0, content: { msgType: ContentType.TEXT, text, url: '', fileName: '', fileSize: 0, width: 0, height: 0, duration: 0, extra: '' }, serverTime: Date.now() }
     addMessage(sessionId, optimistic)
 
-    wsService.send(Cmd.C2C_MSG, MsgType.REQUEST, { receiverId, content: { msgType: 1, text }, clientMsgId })
+    wsService.send(Cmd.C2C_MSG, MsgType.REQUEST, { receiverId, content: { msgType: ContentType.TEXT, text }, clientMsgId })
   }
 
   function sendGroupMessage(groupId: number, text: string) {
@@ -108,11 +128,82 @@ export const useChatStore = defineStore('chat', () => {
     const sessionId = `group_${groupId}`
     const auth = useAuthStore()
 
-    const optimistic: Message = { msgId: -Date.now(), senderId: auth.userId, seq: 0, content: { msgType: 1, text, url: '', fileName: '', fileSize: 0, width: 0, height: 0, duration: 0, extra: '' }, serverTime: Date.now() }
+    const optimistic: Message = { msgId: -Date.now(), senderId: auth.userId, seq: 0, content: { msgType: ContentType.TEXT, text, url: '', fileName: '', fileSize: 0, width: 0, height: 0, duration: 0, extra: '' }, serverTime: Date.now() }
     addMessage(sessionId, optimistic)
 
-    wsService.send(Cmd.GROUP_MSG, MsgType.REQUEST, { groupId, content: { msgType: 1, text }, clientMsgId })
+    wsService.send(Cmd.GROUP_MSG, MsgType.REQUEST, { groupId, content: { msgType: ContentType.TEXT, text }, clientMsgId })
   }
 
-  return { sessions, currentSessionId, messages, currentMessages, currentSession, initListeners, requestSessions, requestSync, selectSession, sendC2CMessage, sendGroupMessage }
+  // Phase 2: Send file/image message
+  function sendC2CFileMessage(receiverId: number, msgType: number, url: string, fileName: string, fileSize: number) {
+    const auth = useAuthStore()
+    const sessionId = receiverId < auth.userId ? `c2c_${receiverId}_${auth.userId}` : `c2c_${auth.userId}_${receiverId}`
+    const clientMsgId = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`
+
+    const optimistic: Message = { msgId: -Date.now(), senderId: auth.userId, seq: 0, content: { msgType, text: '', url, fileName, fileSize, width: 0, height: 0, duration: 0, extra: '' }, serverTime: Date.now() }
+    addMessage(sessionId, optimistic)
+
+    wsService.send(Cmd.C2C_MSG, MsgType.REQUEST, { receiverId, content: { msgType, text: '', url, fileName, fileSize }, clientMsgId })
+  }
+
+  function sendGroupFileMessage(groupId: number, msgType: number, url: string, fileName: string, fileSize: number) {
+    const clientMsgId = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`
+    const sessionId = `group_${groupId}`
+    const auth = useAuthStore()
+
+    const optimistic: Message = { msgId: -Date.now(), senderId: auth.userId, seq: 0, content: { msgType, text: '', url, fileName, fileSize, width: 0, height: 0, duration: 0, extra: '' }, serverTime: Date.now() }
+    addMessage(sessionId, optimistic)
+
+    wsService.send(Cmd.GROUP_MSG, MsgType.REQUEST, { groupId, content: { msgType, text: '', url, fileName, fileSize }, clientMsgId })
+  }
+
+  // Phase 2: Recall message
+  async function recallMessage(msgId: number, sessionId: string) {
+    try {
+      const res = await api.recallMessage(msgId, sessionId)
+      if (res.code === 0) {
+        // Mark the message as recalled locally
+        const list = messages.value.get(sessionId)
+        if (list) {
+          const msg = list.find(m => m.msgId === msgId)
+          if (msg) {
+            msg.content = { msgType: ContentType.SYSTEM, text: 'Message recalled', url: '', fileName: '', fileSize: 0, width: 0, height: 0, duration: 0, extra: '' }
+          }
+        }
+      }
+      return res
+    } catch {
+      return { code: -1, msg: 'Network error' }
+    }
+  }
+
+  // Phase 2: Search messages
+  async function searchMessages(q: string, sessionId?: string) {
+    isSearching.value = true
+    try {
+      const res = await api.searchMessages(q, sessionId)
+      if (res.code === 0) {
+        searchResults.value = res.messages || []
+      }
+      return res
+    } catch {
+      searchResults.value = []
+      return { code: -1, messages: [] }
+    } finally {
+      isSearching.value = false
+    }
+  }
+
+  function clearSearch() {
+    searchResults.value = []
+  }
+
+  return {
+    sessions, currentSessionId, messages, currentMessages, currentSession,
+    searchResults, isSearching,
+    initListeners, requestSessions, requestSync, selectSession,
+    sendC2CMessage, sendGroupMessage,
+    sendC2CFileMessage, sendGroupFileMessage,
+    recallMessage, markAsRead, searchMessages, clearSearch,
+  }
 })

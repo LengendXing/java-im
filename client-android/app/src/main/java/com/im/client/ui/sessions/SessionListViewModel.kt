@@ -1,6 +1,7 @@
 package com.im.client.ui.sessions
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -31,6 +32,9 @@ class SessionListViewModel : ViewModel() {
     var isRefreshing by mutableStateOf(false)
         private set
 
+    var selectedTab by mutableIntStateOf(0)
+        private set
+
     init {
         viewModelScope.launch {
             sessionRepository.getAllSessionsFlow().collect { list ->
@@ -47,6 +51,10 @@ class SessionListViewModel : ViewModel() {
             sessionRepository.refreshSessions()
             isRefreshing = false
         }
+    }
+
+    fun selectTab(index: Int) {
+        selectedTab = index
     }
 
     private fun startListeningNotifies() {

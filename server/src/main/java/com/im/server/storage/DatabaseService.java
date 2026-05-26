@@ -237,6 +237,138 @@ public class DatabaseService {
         return promise.future();
     }
 
+    public Future<Void> acceptFriendRequest(long fromUserId, long toUserId) {
+        Promise<Void> promise = Promise.promise();
+        // Update request status, then add bidirectional friend records
+        pool.preparedQuery("UPDATE im_friend_request SET status = 1 WHERE from_user_id = ? AND to_user_id = ? AND status = 0")
+                .execute(Tuple.of(fromUserId, toUserId))
+                .compose(v -> pool.preparedQuery("INSERT IGNORE INTO im_friend (user_id, friend_id, created_at) VALUES (?, ?, ?), (?, ?, ?)")
+                        .execute(Tuple.of(toUserId, fromUserId, System.currentTimeMillis(), fromUserId, toUserId, System.currentTimeMillis())))
+                .onSuccess(v -> promise.complete())
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    public Future<Void> rejectFriendRequest(long fromUserId, long toUserId) {
+        Promise<Void> promise = Promise.promise();
+        pool.preparedQuery("UPDATE im_friend_request SET status = 2 WHERE from_user_id = ? AND to_user_id = ? AND status = 0")
+                .execute(Tuple.of(fromUserId, toUserId))
+                .onSuccess(rows -> promise.complete())
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    public Future<List<User>> getPendingFriendRequests(long userId) {
+        Promise<List<User>> promise = Promise.promise();
+        pool.preparedQuery("SELECT u.user_id, u.username, u.nickname, u.avatar_url FROM im_friend_request r JOIN im_users u ON r.from_user_id = u.user_id WHERE r.to_user_id = ? AND r.status = 0 ORDER BY r.created_at DESC")
+                .execute(Tuple.of(userId))
+                .onSuccess(rows -> {
+                    List<User> users = new ArrayList<>();
+                    for (Row row : rows) {
+                        User u = new User();
+                        u.setUserId(row.getLong(0));
+                        u.setUsername(row.getString(1));
+                        u.setNickname(row.getString(2));
+                        u.setAvatarUrl(row.getString(3));
+                        users.add(u);
+                    }
+                    promise.complete(users);
+                })
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    public Future<Void> removeGroupMember(long groupId, long userId) {
+        Promise<Void> promise = Promise.promise();
+        pool.preparedQuery("DELETE FROM im_group_member WHERE group_id = ? AND user_id = ?")
+                .execute(Tuple.of(groupId, userId))
+                .onSuccess(rows -> promise.complete())
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    public Future<Void> dissolveGroup(long groupId) {
+        Promise<Void> promise = Promise.promise();
+        pool.preparedQuery("DELETE FROM im_group_member WHERE group_id = ?")
+                .execute(Tuple.of(groupId))
+                .compose(v -> pool.preparedQuery("DELETE FROM im_group WHERE group_id = ?")
+                        .execute(Tuple.of(groupId)))
+                .onSuccess(v -> promise.complete())
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    public Future<Boolean> isGroupOwner(long groupId, long userId) {
+        Promise<Boolean> promise = Promise.promise();
+        pool.preparedQuery("SELECT owner_id FROM im_group WHERE group_id = ?")
+                .execute(Tuple.of(groupId))
+                .onSuccess(rows -> {
+                    if (rows.iterator().hasNext()) {
+                        promise.complete(rows.iterator().next().getLong(0) == userId);
+                    } else {
+                        promise.complete(false);
+                    }
+                })
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    public Future<Void> recallMessage(long msgId, String sessionId) {
+        Promise<Void> promise = Promise.promise();
+        pool.preparedQuery("UPDATE im_message SET content_type = 6, content_text = '' WHERE msg_id = ? AND session_id = ?")
+                .execute(Tuple.of(msgId, sessionId))
+                .onSuccess(rows -> promise.complete())
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    public Future<Message> getMessageById(long msgId) {
+        Promise<Message> promise = Promise.promise();
+        pool.preparedQuery("SELECT msg_id, session_id, sender_id, seq, content_type, content_text, content_url, content_extra, client_msg_id, server_time FROM im_message WHERE msg_id = ?")
+                .execute(Tuple.of(msgId))
+                .onSuccess(rows -> {
+                    if (rows.iterator().hasNext()) {
+                        promise.complete(rowToMessage(rows.iterator().next()));
+                    } else {
+                        promise.complete(null);
+                    }
+                })
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    public Future<Void> updateLastReadSeq(long userId, String sessionId, long seq) {
+        Promise<Void> promise = Promise.promise();
+        pool.preparedQuery("UPDATE im_session SET last_read_seq = ? WHERE user_id = ? AND session_id = ? AND (last_read_seq IS NULL OR last_read_seq < ?)")
+                .execute(Tuple.of(seq, userId, sessionId, seq))
+                .onSuccess(rows -> promise.complete())
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
+    public Future<List<Message>> searchMessages(String sessionId, String keyword, int limit) {
+        Promise<List<Message>> promise = Promise.promise();
+        String query;
+        Tuple params;
+        if (sessionId == null || sessionId.isEmpty()) {
+            query = "SELECT msg_id, session_id, sender_id, seq, content_type, content_text, content_url, content_extra, client_msg_id, server_time FROM im_message WHERE content_text LIKE ? ORDER BY server_time DESC LIMIT ?";
+            params = Tuple.of("%" + keyword + "%", limit);
+        } else {
+            query = "SELECT msg_id, session_id, sender_id, seq, content_type, content_text, content_url, content_extra, client_msg_id, server_time FROM im_message WHERE session_id = ? AND content_text LIKE ? ORDER BY server_time DESC LIMIT ?";
+            params = Tuple.of(sessionId, "%" + keyword + "%", limit);
+        }
+        pool.preparedQuery(query).execute(params)
+                .onSuccess(rows -> {
+                    List<Message> messages = new ArrayList<>();
+                    for (Row row : rows) {
+                        messages.add(rowToMessage(row));
+                    }
+                    promise.complete(messages);
+                })
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
     public Future<List<User>> getFriendList(long userId, int limit) {
         Promise<List<User>> promise = Promise.promise();
         pool.preparedQuery("SELECT u.user_id, u.username, u.nickname, u.avatar_url FROM im_friend f JOIN im_users u ON f.friend_id = u.user_id WHERE f.user_id = ? ORDER BY f.created_at DESC LIMIT ?")
@@ -327,6 +459,8 @@ public class DatabaseService {
                 status INT NOT NULL DEFAULT 0,
                 created_at BIGINT NOT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ALTER TABLE im_session ADD COLUMN IF NOT EXISTS last_read_seq BIGINT DEFAULT 0;
+            ALTER TABLE im_message ADD COLUMN IF NOT EXISTS is_recalled TINYINT DEFAULT 0;
             """;
         pool.query(sql).execute()
                 .onSuccess(rows -> {

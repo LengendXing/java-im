@@ -27,11 +27,18 @@ public class ChatService {
     }
 
     public String sendC2CMessage(long receiverId, String text) {
+        return sendC2CMessage(receiverId, 1, text, null);
+    }
+
+    public String sendC2CMessage(long receiverId, int msgType, String text, String url) {
         String clientMsgId = UUID.randomUUID().toString();
-        ImProto.MessageContent content = ImProto.MessageContent.newBuilder()
-                .setMsgType(1)
-                .setText(text)
-                .build();
+        ImProto.MessageContent.Builder contentBuilder = ImProto.MessageContent.newBuilder()
+                .setMsgType(msgType)
+                .setText(text != null ? text : "");
+        if (url != null) {
+            contentBuilder.setUrl(url);
+        }
+        ImProto.MessageContent content = contentBuilder.build();
 
         ImProto.C2CMsgRequest req = ImProto.C2CMsgRequest.newBuilder()
                 .setReceiverId(receiverId)
@@ -44,11 +51,18 @@ public class ChatService {
     }
 
     public String sendGroupMessage(long groupId, String text) {
+        return sendGroupMessage(groupId, 1, text, null);
+    }
+
+    public String sendGroupMessage(long groupId, int msgType, String text, String url) {
         String clientMsgId = UUID.randomUUID().toString();
-        ImProto.MessageContent content = ImProto.MessageContent.newBuilder()
-                .setMsgType(1)
-                .setText(text)
-                .build();
+        ImProto.MessageContent.Builder contentBuilder = ImProto.MessageContent.newBuilder()
+                .setMsgType(msgType)
+                .setText(text != null ? text : "");
+        if (url != null) {
+            contentBuilder.setUrl(url);
+        }
+        ImProto.MessageContent content = contentBuilder.build();
 
         ImProto.GroupMsgRequest req = ImProto.GroupMsgRequest.newBuilder()
                 .setGroupId(groupId)
@@ -85,6 +99,16 @@ public class ChatService {
         msg.setSenderId(notify.getSenderId());
         msg.setSessionId(notify.getSessionId());
         msg.setText(notify.getContent().getText());
+        msg.setMsgType(notify.getContent().getMsgType());
+        if (!notify.getContent().getUrl().isEmpty()) {
+            msg.setUrl(notify.getContent().getUrl());
+        }
+        if (!notify.getContent().getFileName().isEmpty()) {
+            msg.setFileName(notify.getContent().getFileName());
+        }
+        if (notify.getContent().getFileSize() > 0) {
+            msg.setFileSize(notify.getContent().getFileSize());
+        }
         msg.setServerTime(notify.getServerTime());
         msg.setSentByMe(false);
 
@@ -108,6 +132,16 @@ public class ChatService {
         msg.setSenderId(notify.getSenderId());
         msg.setSessionId(notify.getSessionId());
         msg.setText(notify.getContent().getText());
+        msg.setMsgType(notify.getContent().getMsgType());
+        if (!notify.getContent().getUrl().isEmpty()) {
+            msg.setUrl(notify.getContent().getUrl());
+        }
+        if (!notify.getContent().getFileName().isEmpty()) {
+            msg.setFileName(notify.getContent().getFileName());
+        }
+        if (notify.getContent().getFileSize() > 0) {
+            msg.setFileSize(notify.getContent().getFileSize());
+        }
         msg.setServerTime(notify.getServerTime());
         msg.setSentByMe(false);
 

@@ -8,6 +8,10 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
 
   mysql:
     image: mysql:8.0
@@ -22,27 +26,31 @@ services:
       - mysql_data:/var/lib/mysql
       - ./server/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 10
 
-  minio:
-    image: minio/minio:latest
+  dufs:
+    image: sigoden/dufs:latest
     ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: im_minio
-      MINIO_ROOT_PASSWORD: im_minio_pass
+      - "5100:5100"
     volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
+      - uploads_data:/app/uploads
+    command: /app/uploads --port 5100 --allow-upload --allow-delete --allow-search
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5100/"]
+      interval: 5s
+      retries: 5
 
   im-server:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: server/Dockerfile
     ports:
-      - "8800:8800"  # TCP
-      - "8801:8801"  # WebSocket
-      - "8080:8080"  # HTTP API
+      - "8800:8800"   # TCP
+      - "8801:8801"   # WebSocket
+      - "8080:8080"   # HTTP API
     environment:
       IM_REDIS_HOST: redis
       IM_REDIS_PORT: 6379
@@ -52,12 +60,17 @@ services:
       IM_MYSQL_USER: im_user
       IM_MYSQL_PASSWORD: im_pass_2024
       IM_JWT_SECRET: change-me-in-production-env
-      IM_MINIO_HOST: minio
-      IM_MINIO_PORT: 9000
+      DUFS_URL: http://dufs:5100
+      dufs.upload.dir: /app/uploads
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
-      - redis
-      - mysql
-      - minio
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      dufs:
+        condition: service_healthy
     restart: on-failure
 
   im-web:
@@ -68,8 +81,9 @@ services:
       - "3000:80"
     depends_on:
       - im-server
+    restart: on-failure
 
 volumes:
   redis_data:
   mysql_data:
-  minio_data:
+  uploads_data:

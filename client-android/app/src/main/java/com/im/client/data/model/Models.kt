@@ -17,7 +17,8 @@ data class Message(
     val serverTime: Long,
     val clientMsgId: String = "",
     val isRead: Boolean = false,
-    val isMine: Boolean = false
+    val isMine: Boolean = false,
+    val isRecalled: Boolean = false
 )
 
 data class Session(
@@ -38,6 +39,22 @@ data class Group(
     val name: String,
     val avatarUrl: String,
     val memberCount: Int
+)
+
+data class FriendRequest(
+    val requestId: Long,
+    val fromUserId: Long,
+    val fromNickname: String,
+    val fromAvatarUrl: String,
+    val message: String,
+    val createTime: Long,
+    val status: Int // 0=pending, 1=accepted, 2=rejected
+)
+
+data class FileUploadResult(
+    val url: String,
+    val fileName: String,
+    val fileSize: Long
 )
 
 enum class SessionType(val value: Int) {

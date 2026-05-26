@@ -4,6 +4,7 @@ import android.util.Log
 import com.im.client.data.local.AppDatabase
 import com.im.client.data.local.MessageEntity
 import com.im.client.data.model.Message
+import com.im.client.data.remote.ApiService
 import com.im.client.data.remote.Cmd
 import com.im.client.data.remote.MsgType
 import com.im.client.data.remote.TcpConnection
@@ -16,7 +17,8 @@ import java.util.UUID
 
 class ChatRepository(
     private val tcpConnection: TcpConnection,
-    private val database: AppDatabase
+    private val database: AppDatabase,
+    private val apiService: ApiService
 ) {
     companion object {
         private const val TAG = "ChatRepository"
@@ -61,7 +63,7 @@ class ChatRepository(
                 val message = Message(
                     msgId = ack.msgId,
                     sessionId = "c2c_${receiverId}",
-                    senderId = 0, // self, will be filled from auth
+                    senderId = 0,
                     seq = ack.seq,
                     msgType = msgType,
                     content = content,
@@ -71,10 +73,7 @@ class ChatRepository(
                     isRead = true
                 )
                 messageDao.insert(message.toEntity())
-
-                // Update session last message
                 sessionDao.updateLastMessage("c2c_${receiverId}", content, ack.serverTime)
-
                 Result.success(message)
             } catch (e: Exception) {
                 Log.e(TAG, "Send message failed: ${e.message}")
@@ -120,7 +119,6 @@ class ChatRepository(
                 )
                 messageDao.insert(message.toEntity())
                 sessionDao.updateLastMessage("group_${groupId}", content, ack.serverTime)
-
                 Result.success(message)
             } catch (e: Exception) {
                 Log.e(TAG, "Send group message failed: ${e.message}")
@@ -147,7 +145,6 @@ class ChatRepository(
                 messageDao.insert(entity)
                 sessionDao.updateLastMessage(notify.sessionId, notify.content.text, notify.serverTime)
 
-                // Send ACK
                 val ackReq = ImProto.MsgAckRequest.newBuilder()
                     .setMsgId(notify.msgId)
                     .setSessionId(notify.sessionId)
@@ -194,19 +191,98 @@ class ChatRepository(
         messageDao.markSessionRead(sessionId)
     }
 
+    // --- Phase 2 methods ---
+
+    suspend fun recallMessage(token: String, msgId: Long, sessionId: String): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                apiService.recallMessage(token, msgId, sessionId)
+                messageDao.markRecalled(msgId)
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Log.e(TAG, "Recall message failed: ${e.message}")
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun markReadViaApi(token: String, sessionId: String): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val lastSeq = messageDao.getLastSeq(sessionId) ?: 0L
+                apiService.markMessageRead(token, sessionId, lastSeq)
+                messageDao.markSessionRead(sessionId)
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Log.e(TAG, "Mark read via API failed: ${e.message}")
+                Result.failure(e)
+            }
+        }
+    }
+
+    fun searchMessagesFlow(sessionId: String, keyword: String): Flow<List<Message>> {
+        return messageDao.searchBySessionFlow(sessionId, "%$keyword%").map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    suspend fun searchMessagesViaApi(token: String, keyword: String, sessionId: String): List<Message> {
+        return withContext(Dispatchers.IO) {
+            try {
+                apiService.searchMessages(token, keyword, sessionId).map { r ->
+                    Message(
+                        msgId = r.msgId, sessionId = r.sessionId, senderId = r.senderId,
+                        seq = r.seq, msgType = r.msgType, content = r.content,
+                        serverTime = r.serverTime, isRead = true, isMine = false
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Search messages failed: ${e.message}")
+                emptyList()
+            }
+        }
+    }
+
+    suspend fun uploadAndSendFile(
+        token: String,
+        fileBytes: ByteArray,
+        fileName: String,
+        mimeType: String,
+        targetId: Long,
+        isGroup: Boolean
+    ): Result<Message> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val uploadResult = apiService.uploadFile(token, fileBytes, fileName, mimeType)
+                val msgType = if (mimeType.startsWith("image/")) 2 else 3
+                val content = uploadResult.url
+
+                if (isGroup) {
+                    sendGroupMessage(targetId, content, msgType)
+                } else {
+                    sendMessage(targetId, content, msgType)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Upload and send file failed: ${e.message}")
+                Result.failure(e)
+            }
+        }
+    }
+
     private fun MessageEntity.toDomain() = Message(
         msgId = msgId, sessionId = sessionId, senderId = senderId, seq = seq,
         msgType = msgType, content = content, serverTime = serverTime,
-        clientMsgId = clientMsgId, isRead = isRead, isMine = isMine
+        clientMsgId = clientMsgId, isRead = isRead, isMine = isMine,
+        isRecalled = isRecalled
     )
 
     private fun Message.toEntity() = MessageEntity(
         msgId = msgId, sessionId = sessionId, senderId = senderId, seq = seq,
         msgType = msgType, content = content, serverTime = serverTime,
-        clientMsgId = clientMsgId, isRead = isRead, isMine = isMine
+        clientMsgId = clientMsgId, isRead = isRead, isMine = isMine,
+        isRecalled = isRecalled
     )
 
-    // Room doesn't return Flow from DAO directly with suspend, use this helper
     private fun messageDao.getBySessionFlow(sessionId: String): Flow<List<MessageEntity>> {
         return database.messageDao().getBySessionFlow(sessionId)
     }

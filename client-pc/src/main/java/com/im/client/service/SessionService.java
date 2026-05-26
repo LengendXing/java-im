@@ -87,6 +87,17 @@ public class SessionService {
                         msg.setSenderId(protoMsg.getSenderId());
                         msg.setSessionId(sm.getSessionId());
                         msg.setText(protoMsg.getContent().getText());
+                        msg.setMsgType(protoMsg.getContent().getMsgType());
+                        if (!protoMsg.getContent().getUrl().isEmpty()) {
+                            msg.setUrl(protoMsg.getContent().getUrl());
+                        }
+                        if (!protoMsg.getContent().getFileName().isEmpty()) {
+                            msg.setFileName(protoMsg.getContent().getFileName());
+                        }
+                        if (protoMsg.getContent().getFileSize() > 0) {
+                            msg.setFileSize(protoMsg.getContent().getFileSize());
+                        }
+                        msg.setRecalled(protoMsg.getIsRecalled());
                         msg.setServerTime(protoMsg.getServerTime());
                         session.getMessages().add(msg);
                     }

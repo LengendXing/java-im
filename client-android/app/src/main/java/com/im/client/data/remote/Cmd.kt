@@ -22,8 +22,18 @@ object Cmd {
     const val SESSION_LIST_ACK: Int = 0x0402
     const val FRIEND_APPLY: Int = 0x0501
     const val FRIEND_LIST: Int = 0x0502
+    const val FRIEND_REQUEST_LIST: Int = 0x0504
+    const val FRIEND_ACCEPT: Int = 0x0511
+    const val FRIEND_REJECT: Int = 0x0512
     const val GROUP_CREATE: Int = 0x0601
     const val GROUP_MEMBER_LIST: Int = 0x0602
+    const val GROUP_INVITE: Int = 0x0603
+    const val GROUP_KICK: Int = 0x0604
+    const val GROUP_DISSOLVE: Int = 0x0605
+    const val MSG_ACK: Int = 0x0110
+    const val MSG_READ: Int = 0x0111
+    const val MSG_RECALL: Int = 0x0121
+    const val FILE_UPLOAD: Int = 0x0701
     const val KICKOFF: Int = 0x0F01
 }
 

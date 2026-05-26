@@ -86,6 +86,47 @@ public class AuthService {
         }
     }
 
+    /**
+     * Generic HTTP GET with Bearer token auth.
+     * Returns the response body string, or null on failure.
+     */
+    public String httpGet(String url) {
+        String token = JwtUtil.getToken();
+        Request.Builder builder = new Request.Builder().url(url);
+        if (token != null && !token.isEmpty()) {
+            builder.header("Authorization", "Bearer " + token);
+        }
+        try (Response response = httpClient.newCall(builder.build()).execute()) {
+            if (response.body() != null) {
+                return response.body().string();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Generic HTTP POST with Bearer token auth and JSON body.
+     * Returns the response body string, or null on failure.
+     */
+    public String httpPost(String url, String jsonBody) {
+        String token = JwtUtil.getToken();
+        RequestBody body = RequestBody.create(jsonBody, JSON_TYPE);
+        Request.Builder builder = new Request.Builder().url(url).post(body);
+        if (token != null && !token.isEmpty()) {
+            builder.header("Authorization", "Bearer " + token);
+        }
+        try (Response response = httpClient.newCall(builder.build()).execute()) {
+            if (response.body() != null) {
+                return response.body().string();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     public record AuthResult(boolean success, String message, String token) {
     }
 }

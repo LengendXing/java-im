@@ -54,7 +54,7 @@ public class Main {
 
                                 return deployVerticles(vertx, depOpts);
                             })
-                            .onSuccess(v -> log.info("java-im server v0.1.0 started"))
+                            .onSuccess(v -> log.info("java-im server v0.2.0 started"))
                             .onFailure(err -> {
                                 log.error("Server startup failed: {}", err.getMessage());
                                 vertx.close();
@@ -76,7 +76,7 @@ public class Main {
                     DeploymentOptions depOpts = new DeploymentOptions().setConfig(verticleConfig);
 
                     deployVerticles(vertx, depOpts)
-                            .onSuccess(v -> log.info("java-im server v0.1.0 started (default config)"))
+                            .onSuccess(v -> log.info("java-im server v0.2.0 started (default config)"))
                             .onFailure(e -> {
                                 log.error("Server startup failed: {}", e.getMessage());
                                 vertx.close();
