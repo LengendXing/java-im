@@ -51,19 +51,50 @@ v0.4.0 定位为 **"生产就绪"** 版本，核心目标：
 
 ---
 
-### 模块 B：Kafka 消息中间件
+### 模块 B：Folkmq 轻量级消息中间件
+
+> **选型说明：** Folkmq 是 Solon 家族的轻量级消息队列，原生适配 Solon Cloud Event 规范（`folkmq-solon-cloud-plugin`），支持确认重试守护、自动延时、定时事件、命名空间、分组、元信息、消息事务。单机部署仅需一个 JVM 进程，无 Zookeeper 依赖，运维成本远低于 Kafka/RabbitMQ。Docker 镜像约 10MB，适合中小规模 IM 系统。
 
 | 编号 | 功能 | 优先级 | 描述 |
 |------|------|--------|------|
-| B1 | Kafka Producer 集成 | P0 | Logic Verticle 将 C2C/Group 消息写入 Kafka topic（im-c2c、im-group），替代直接 EventBus |
-| B2 | Kafka Consumer 集成 | P0 | PushVerticle 消费 Kafka 消息，按 gatewayId 路由推送 |
-| B3 | 消息持久化保证 | P0 | Producer acks=all，Consumer 手动 commit offset，确保消息至少投递一次 |
-| B4 | 顺序性保证 | P1 | 单聊消息按 session_id 分区，保证同一会话消息有序 |
-| B5 | 死信队列 | P2 | 推送失败超过 3 次的消息进入 DLQ topic，人工/自动重试 |
+| B1 | Folkmq Server 嵌入部署 | P0 | Folkmq Server 作为独立进程或嵌入模式运行，Docker Compose 新增 folkmq 服务，端口 8602 |
+| B2 | Folkmq Producer 集成 | P0 | 通过 Solon Cloud Event 接口 `CloudClient.event().publish()` 发送 C2C/Group 消息事件，topic 分为 im-c2c / im-group |
+| B3 | Folkmq Consumer 集成 | P0 | PushVerticle 通过 `@CloudEvent` 注解订阅消息，按 gatewayId 路由推送；失败自动延时重试（5s→10s→30s→1m→2m→5m…） |
+| B4 | 消息持久化保证 | P0 | Folkmq 服务端持久化消息，Consumer 确认后才删除；宕机恢复后消息不丢 |
+| B5 | 顺序性保证 | P1 | 单聊消息按 session_id 作为 group key，保证同一会话消息有序投递 |
+| B6 | 死信处理 | P2 | 推送失败超过阈值的消息通过 Folkmq 定时事件机制延迟重试，或进入告警通知 |
+
+**配置示例：**
+```yaml
+solon.app:
+  group: im
+  name: im-server
+
+solon.cloud.folkmq.event:
+  server: "folkmq://folkmq:8602"
+  publishTimeout: 3000
+```
+
+**代码示例：**
+```java
+// 发布消息
+CloudClient.event().publish(new Event("im-c2c", payload).group(sessionId));
+
+// 订阅消息
+@CloudEvent(topic="im-c2c", group="${sessionId}")
+public class C2CEventHandler implements CloudEventHandler {
+    @Override
+    public boolean handle(Event event) throws Throwable {
+        // 按 gatewayId 路由推送
+        return true; // 返回 true 确认消费
+    }
+}
+```
 
 **验收标准：**
-- 下游 PushVerticle 宕机 30s 后恢复，期间消息不丢（Kafka 持久化）
+- 下游 PushVerticle 宕机 30s 后恢复，期间消息不丢（Folkmq 持久化）
 - 单聊消息严格有序（同一 session_id 的消息 seq 递增）
+- Folkmq Server 单实例内存占用 < 50MB
 
 ---
 
@@ -231,15 +262,65 @@ promtail:
 
 ---
 
-### 模块 I：Nacos 服务注册发现
+### 模块 I：RNacos 服务注册发现
+
+> **选型说明：** RNacos 是 Nacos 的 Rust 重写版，完全兼容 Nacos Client SDK 协议（1.x HTTP OpenAPI + 2.x gRPC）。二进制约 10MB，运行时 CPU < 0.5%、内存 < 5MB。单机模式无需 MySQL（Raft + 本地文件存储），集群模式内置 Raft 共识无需外部依赖。支持注册中心、配置中心、Web 管理控制台。Docker 镜像：`qingpan/rnacos:stable`。
 
 | 编号 | 功能 | 优先级 | 描述 |
 |------|------|--------|------|
-| I1 | Nacos Server 部署 | P1 | Docker Compose 新增 nacos 服务，standalone 模式 |
-| I2 | 服务注册 | P1 | Gateway/Logic 启动时注册到 Nacos，携带 host/port/weight/metadata |
-| I3 | 服务发现 | P1 | PushVerticle 从 Nacos 拉取 Gateway 实例列表，替代 Redis 路由表 |
-| I4 | 心跳保活 | P1 | Nacos 客户端自动心跳，实例下线自动摘除 |
-| I5 | 配置中心 | P2 | ServerConfig 改为从 Nacos Config 拉取，支持热更新 |
+| I1 | RNacos 单机部署 | P0 | Docker Compose 新增 rnacos 服务，单机模式（1 节点集群），端口 8848（API）+ 10848（控制台） |
+| I2 | RNacos 集群部署 | P1 | 3 节点 Raft 集群，Raft 协议自动选举 Leader，数据节点本地文件存储，无需 MySQL |
+| I3 | 服务注册 | P0 | Gateway/Logic 启动时通过 nacos-client SDK 注册到 RNacos，携带 host/port/weight/metadata |
+| I4 | 服务发现 | P0 | PushVerticle 从 RNacos 拉取 Gateway 实例列表，替代 Redis 路由表 |
+| I5 | 心跳保活 | P0 | Nacos 客户端自动心跳（5s 间隔），实例下线自动摘除 |
+| I6 | 配置中心 | P1 | ServerConfig 改为从 RNacos Config 拉取，支持热更新（dataId: im-server.yml） |
+| I7 | Web 控制台 | P2 | RNacos 内置管理控制台（端口 10848），支持用户管理/命名空间/配置管理/服务管理 |
+| I8 | 数据备份恢复 | P2 | 备份 RNACOS_CONFIG_DB_DIR 目录即可，Raft 日志 + 快照 |
+
+**单机部署配置：**
+```yaml
+rnacos:
+  image: qingpan/rnacos:stable
+  ports:
+    - "8848:8848"    # Nacos API
+    - "10848:10848"  # 管理控制台
+  environment:
+    RNACOS_RUN_MODE: standalone
+    RNACOS_CONFIG_DB_DIR: /data/nacos_db
+  volumes:
+    - rnacos_data:/data
+```
+
+**集群部署配置：**
+```yaml
+rnacos-node1:
+  image: qingpan/rnacos:stable
+  environment:
+    RNACOS_RUN_MODE: cluster
+    RNACOS_CONFIG_DB_DIR: /data/nacos_db
+    RNACOS_RAFT_NODE_ID: 1
+    RNACOS_RAFT_NODE_ADDR: rnacos-node1:9848
+    RNACOS_RAFT_JOIN_ADDR: rnacos-node1:9848  # 首节点自指
+rnacos-node2:
+  image: qingpan/rnacos:stable
+  environment:
+    RNACOS_RUN_MODE: cluster
+    RNACOS_RAFT_NODE_ID: 2
+    RNACOS_RAFT_NODE_ADDR: rnacos-node2:9848
+    RNACOS_RAFT_JOIN_ADDR: rnacos-node1:9848  # 加入节点1
+rnacos-node3:
+  image: qingpan/rnacos:stable
+  environment:
+    RNACOS_RUN_MODE: cluster
+    RNACOS_RAFT_NODE_ID: 3
+    RNACOS_RAFT_NODE_ADDR: rnacos-node3:9848
+    RNACOS_RAFT_JOIN_ADDR: rnacos-node1:9848  # 加入节点1
+```
+
+**验收标准：**
+- 单机模式：启动 < 2s，内存 < 5MB，服务注册/发现/配置读取正常
+- 集群模式：3 节点 Raft 选举，任一节点宕机后服务注册/发现不受影响
+- nacos-client Java SDK 2.x（gRPC 协议）完全兼容
 
 ---
 
@@ -252,7 +333,7 @@ promtail:
 | 可扩展性 | 水平扩容无需停机，新实例加入集群自动发现 |
 | 兼容性 | v0.4.0 客户端兼容 v0.3.0 服务端（协议向后兼容） |
 | 日志保留 | 热日志 30 天，归档日志 180 天 |
-| 部署 | Docker Compose 一键拉起全部服务（含 Kafka/Nacos/Grafana/Loki） |
+| 部署 | Docker Compose 一键拉起全部服务（含 Folkmq/RNacos/Grafana/Loki） |
 
 ---
 
@@ -284,17 +365,17 @@ promtail:
 
 ## 六、迭代计划
 
-### Sprint 1（v0.4.0-alpha.1）— 集群化 + Kafka
+### Sprint 1（v0.4.0-alpha.1）— 集群化 + Folkmq
 
 | 任务 | 预计工时 | 依赖 |
 |------|----------|------|
 | A1: Hazelcast Cluster Manager | 4h | - |
 | A2: Gateway 无状态化 | 4h | A1 |
 | A3: Logic Verticle 多实例 | 2h | A1 |
-| B1-B3: Kafka Producer/Consumer | 8h | A1 |
-| B4: 消息有序性 | 4h | B1 |
-| Docker Compose 扩展（Kafka/Zookeeper） | 2h | B1 |
-| **小计** | **24h** | |
+| B1-B4: Folkmq Producer/Consumer + 持久化 | 6h | A1 |
+| B5: 消息有序性（group key） | 2h | B1 |
+| Docker Compose 扩展（Folkmq） | 2h | B1 |
+| **小计** | **20h** | |
 
 ### Sprint 2（v0.4.0-alpha.2）— 分库分表 + 大群优化
 
@@ -332,17 +413,19 @@ promtail:
 | H3: 72h 稳定性测试 | 4h | H1 |
 | **小计** | **24h** | |
 
-### Sprint 5（v0.4.0-rc.1）— Nacos + 集成验收
+### Sprint 5（v0.4.0-rc.1）— RNacos + 集成验收
 
 | 任务 | 预计工时 | 依赖 |
 |------|----------|------|
-| I1-I4: Nacos 服务注册发现 | 6h | Sprint 1 |
-| I5: Nacos 配置中心 | 4h | I1 |
+| I1: RNacos 单机部署 | 2h | Sprint 1 |
+| I2: RNacos 集群部署 | 2h | I1 |
+| I3-I5: 服务注册/发现/心跳 | 4h | I1 |
+| I6: RNacos 配置中心 | 3h | I1 |
 | 全链路集成测试 | 8h | Sprint 1-4 |
 | 文档更新（README/maintain/plan） | 2h | - |
-| **小计** | **20h** | |
+| **小计** | **21h** | |
 
-**总预计工时：134h**
+**总预计工时：131h**
 
 ---
 
@@ -350,7 +433,7 @@ promtail:
 
 | 风险 | 概率 | 影响 | 缓解措施 |
 |------|------|------|----------|
-| Kafka 运维复杂度高 | 中 | 高 | 提供单机模式（无 Kafka）兼容部署，Kafka 为可选依赖 |
+| Folkmq 单实例吞吐量受限 | 低 | 中 | 单机万级 TPS 足够；超限可切换 rabbitmq-solon-cloud-plugin（接口兼容） |
 | E2EE 客户端实现复杂 | 高 | 中 | Sprint 3 优先实现单聊加密，群聊加密延至 v0.5.0 |
 | 分库分表数据迁移风险 | 中 | 高 | 迁移工具支持 dry-run 模式，双写验证后切读 |
 | APNs 证书需 Apple 开发者账号 | 高 | 低 | 先实现 FCM，APNs 预留接口，后续补充 |
@@ -361,11 +444,11 @@ promtail:
 ## 八、交付物清单
 
 - [ ] 源码：server / protocol / client-web / client-pc / client-android
-- [ ] Docker Compose：一键部署含 Kafka/Nacos/Grafana/Loki/Prometheus
+- [ ] Docker Compose：一键部署含 Folkmq/RNacos/Grafana/Loki/Prometheus
 - [ ] Grafana Dashboard JSON 导出文件
 - [ ] JMeter 测试脚本 + 基准测试报告
 - [ ] 数据迁移工具（分库分表）
 - [ ] hazelcast.xml / prometheus.yml / promtail.yml 配置文件
 - [ ] README.md 更新（集群部署指南）
 - [ ] maintain.md / plan.md 更新
-- [ ] .env.example 更新（Kafka/Nacos/APNs/FCM 配置项）
+- [ ] .env.example 更新（Folkmq/RNacos/APNs/FCM 配置项）
