@@ -2,7 +2,7 @@
  * E2EE encryption service for Web client using Web Crypto API.
  * Implements X25519 DH + AES-256-GCM with a simplified Double Ratchet.
  */
-import { Cmd, MsgType, ContentType } from '../proto/constants'
+// E2EE uses Cmd/MsgType for protocol-level encryption flags, ContentType for message type
 
 // Web Crypto API doesn't support X25519 in all browsers yet,
 // so we use ECDH P-256 as fallback + AES-256-GCM for encryption.

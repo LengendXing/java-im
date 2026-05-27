@@ -182,16 +182,6 @@ async function sendFriendRequest(targetUserId: number) {
   } catch { /* ignore */ }
 }
 
-async function addFriendLegacy() {
-  const id = Number(targetUserId.value)
-  if (id <= 0) return
-  try {
-    await applyFriend(id)
-    showAddFriend.value = false
-    await loadFriends()
-  } catch { /* ignore */ }
-}
-
 async function acceptRequest(fromUserId: number) {
   try {
     await acceptFriend(fromUserId)

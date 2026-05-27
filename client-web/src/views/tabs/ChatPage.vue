@@ -131,6 +131,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useChatStore } from '../../stores/chat'
 import { useAuthStore } from '../../stores/auth'
 import { getFriendList, getGroupMembers, kickGroupMember, dissolveGroup, inviteToGroup } from '../../services/api'
@@ -236,12 +237,10 @@ async function inviteMembers() {
   } catch { /* ignore */ }
 }
 
-// Need $t for confirm dialog - import from vue-i18n
-import { useI18n } from 'vue-i18n'
+// Need $t for confirm dialog
 const { t: $t } = useI18n()
 
 // Load friend list when invite dialog opens
-import { watch } from 'vue'
 watch(showInviteDialog, async (val) => {
   if (val) {
     try {
