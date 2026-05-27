@@ -7,6 +7,8 @@
 - Sprint 2：Android客户端补齐 — ApiService新增searchUsers/getGroupMembers/applyFriend、ContactsTab（好友列表+搜索添加）、GroupManageScreen（群管理/踢人/解散）、SettingsScreen（个人信息/深色模式/关于）、NavGraph新增路由
 - Sprint 3：PC客户端补齐 — FriendService新增loadFriendList/searchUsers/applyFriend、MessageService新增searchMessages、Friends/Search/Settings Tab、dark.css深色模式+切换逻辑、JwtUtil新增nickname/username存储
 - Sprint 4：E2EE三端集成 — PC端E2eeService(复用server模块DoubleRatchetSession)、Web端e2ee.ts(Web Crypto API ECDH+AES-256-GCM)、Android端DoubleRatchetSession.kt+E2eeManager.kt、client-pc新增server模块依赖
+- 补充提交：单设备踢出（同用户新连接踢旧连接）、C2CVerticle移除错误信息泄露、nginx WebSocket超时配置、E2EE核心实现+Benchmark+11个单元测试、docker-compose cluster/standalone、v0.5.0三份文档
+- TypeScript编译修复：e2ee.ts移除未使用import、ChatPage.vue合并重复watch/useI18n import、ContactsPage.vue移除未使用addFriendLegacy函数
 
 ### 影响范围
 - 服务端：HttpApiVerticle、DatabaseService
