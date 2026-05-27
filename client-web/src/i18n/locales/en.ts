@@ -22,6 +22,7 @@ export default {
     search: 'Search contacts',
     newFriend: 'New Friends',
     groupChats: 'Group Chats',
+    searchUser: 'Search by username/nickname',
     noContacts: 'No contacts yet',
     addFriend: 'Add Friend',
     friendRequests: 'Friend Requests',

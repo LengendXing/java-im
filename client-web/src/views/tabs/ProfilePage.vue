@@ -6,8 +6,18 @@
         <div class="w-16 h-16 rounded-lg bg-[var(--im-green)] text-white flex items-center justify-center text-2xl font-bold">
           {{ (auth.nickname || auth.username || '?').charAt(0).toUpperCase() }}
         </div>
-        <div>
-          <h2 class="text-lg font-medium">{{ auth.nickname || auth.username }}</h2>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <h2 v-if="!editingNickname" class="text-lg font-medium">{{ auth.nickname || auth.username }}</h2>
+            <input v-else v-model="newNickname" @keydown.enter="saveNickname" @keydown.escape="editingNickname = false"
+              class="im-input text-sm py-1 max-w-[160px]" ref="nicknameInput" />
+            <button v-if="!editingNickname" @click="startEditNickname"
+              class="text-[var(--im-text-secondary)] hover:text-[var(--im-text)] text-xs">✏️</button>
+            <template v-else>
+              <button @click="saveNickname" class="text-[var(--im-green)] text-xs">{{ $t('common.confirm') }}</button>
+              <button @click="editingNickname = false" class="text-[var(--im-text-secondary)] text-xs">{{ $t('common.cancel') }}</button>
+            </template>
+          </div>
           <p class="text-xs text-[var(--im-text-secondary)]">{{ $t('profile.username') }}: {{ auth.username }}</p>
           <div class="flex items-center gap-1 mt-1">
             <span class="w-2 h-2 rounded-full" :class="isConnected ? 'bg-[var(--im-green)]' : 'bg-gray-400'"></span>
@@ -31,6 +41,12 @@
         <span class="text-xs text-[var(--im-text-secondary)]">{{ locale === 'zh' ? '中文' : 'English' }}</span>
       </div>
     </div>
+    <!-- About section -->
+    <div class="mt-2 bg-[var(--im-surface)]">
+      <div class="px-6 py-3.5 text-sm text-[var(--im-text-secondary)]">
+        {{ $t('profile.about') }} · java-im v0.5.0
+      </div>
+    </div>
     <!-- Logout -->
     <div class="mt-2 bg-[var(--im-surface)]">
       <div class="px-6 py-3.5 text-center text-red-500 text-sm cursor-pointer hover:bg-[var(--im-bg-secondary)]" @click="handleLogout">
@@ -41,7 +57,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../../stores/auth'
@@ -52,6 +68,9 @@ const { locale } = useI18n()
 
 const isDark = ref(true)
 const isConnected = ref(true)
+const editingNickname = ref(false)
+const newNickname = ref('')
+const nicknameInput = ref<HTMLInputElement>()
 
 onMounted(() => {
   isDark.value = document.documentElement.classList.contains('dark')
@@ -60,6 +79,21 @@ onMounted(() => {
     document.documentElement.classList.add('dark')
   }
 })
+
+function startEditNickname() {
+  newNickname.value = auth.nickname
+  editingNickname.value = true
+  nextTick(() => nicknameInput.value?.focus())
+}
+
+function saveNickname() {
+  const name = newNickname.value.trim()
+  if (name && name !== auth.nickname) {
+    auth.nickname = name
+    localStorage.setItem('im_nickname', name)
+  }
+  editingNickname.value = false
+}
 
 function toggleDark() {
   isDark.value = !isDark.value

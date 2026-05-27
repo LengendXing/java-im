@@ -9,6 +9,8 @@ public final class JwtUtil {
 
     private static final String TOKEN_FILE = ".jwt_token";
     private static String currentToken;
+    private static String currentUsername;
+    private static String currentNickname;
 
     private JwtUtil() {
     }
@@ -38,9 +40,17 @@ public final class JwtUtil {
 
     public static void clearToken() {
         currentToken = null;
+        currentUsername = null;
+        currentNickname = null;
         try {
             Files.deleteIfExists(Paths.get(TOKEN_FILE));
         } catch (IOException ignored) {
         }
     }
+
+    public static String getUsername() { return currentUsername; }
+    public static void setUsername(String username) { currentUsername = username; }
+
+    public static String getNickname() { return currentNickname; }
+    public static void setNickname(String nickname) { currentNickname = nickname; }
 }

@@ -22,6 +22,7 @@ export default {
     search: '搜索联系人',
     newFriend: '新的朋友',
     groupChats: '群聊',
+    searchUser: '搜索用户名/昵称',
     noContacts: '暂无联系人',
     addFriend: '添加朋友',
     friendRequests: '好友请求',

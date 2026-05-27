@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.sp
 import com.im.client.data.model.Session
 import com.im.client.ui.contacts.FriendRequestsScreen
 import com.im.client.ui.contacts.FriendRequestsViewModel
+import com.im.client.ui.contacts.ContactsTab
+import com.im.client.ui.settings.SettingsScreen
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -51,18 +53,12 @@ fun SessionListScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // Tab row: Sessions | Contacts
+            // Tab row: Sessions | Requests | Contacts | Me
             TabRow(selectedTabIndex = selectedTab) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { viewModel.selectTab(0) },
-                    text = { Text("Sessions") }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { viewModel.selectTab(1) },
-                    text = { Text("Requests") }
-                )
+                Tab(selected = selectedTab == 0, onClick = { viewModel.selectTab(0) }, text = { Text("Sessions") })
+                Tab(selected = selectedTab == 1, onClick = { viewModel.selectTab(1) }, text = { Text("Requests") })
+                Tab(selected = selectedTab == 2, onClick = { viewModel.selectTab(2) }, text = { Text("Contacts") })
+                Tab(selected = selectedTab == 3, onClick = { viewModel.selectTab(3) }, text = { Text("Me") })
             }
 
             when (selectedTab) {
@@ -74,6 +70,11 @@ fun SessionListScreen(
                 )
                 1 -> FriendRequestsScreen(
                     viewModel = androidx.lifecycle.viewmodel.compose.viewModel<FriendRequestsViewModel>()
+                )
+                2 -> ContactsTab(onNavigateToGroupCreate = onNavigateToGroupCreate)
+                3 -> SettingsScreen(
+                    onNavigateBack = { viewModel.selectTab(0) },
+                    onLogout = { viewModel.selectTab(0) }
                 )
             }
         }

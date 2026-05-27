@@ -55,6 +55,19 @@ export const useChatStore = defineStore('chat', () => {
     wsService.on(Cmd.GROUP_MSG_ACK, (_packet) => {
       // ACK received - optimistic message already displayed
     })
+
+    wsService.on(Cmd.MSG_RECALL_NOTIFY, (packet) => {
+      const resp = decodeJsonBody<{ msgId: number; sessionId: string }>(packet.body)
+      const list = messages.value.get(resp.sessionId)
+      if (list) {
+        const msg = list.find(m => m.msgId === resp.msgId)
+        if (msg) {
+          msg.content = { msgType: ContentType.SYSTEM, text: 'Message recalled', url: '', fileName: '', fileSize: 0, width: 0, height: 0, duration: 0, extra: '' }
+        }
+      }
+      const s = sessions.value.find(s => s.sessionId === resp.sessionId)
+      if (s) s.lastMsg = '[Recalled]'
+    })
   }
 
   function addMessage(sessionId: string, msg: Message) {

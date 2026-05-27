@@ -1,3 +1,29 @@
+## v0.5.0 - 2026-05-27
+
+### 变更内容
+- v0.5.0 三端功能补齐，达到生产可用
+- Sprint 0：服务端新增 `GET /api/user/search?q=xxx` 用户模糊搜索API，DatabaseService新增searchUsers方法
+- Sprint 1：Web客户端补齐 — searchUsers API调用、按用户名搜索添加好友、MSG_RECALL_NOTIFY处理、Cmd常量补全、消息搜索UI、昵称编辑、关于版本信息
+- Sprint 2：Android客户端补齐 — ApiService新增searchUsers/getGroupMembers/applyFriend、ContactsTab（好友列表+搜索添加）、GroupManageScreen（群管理/踢人/解散）、SettingsScreen（个人信息/深色模式/关于）、NavGraph新增路由
+- Sprint 3：PC客户端补齐 — FriendService新增loadFriendList/searchUsers/applyFriend、MessageService新增searchMessages、Friends/Search/Settings Tab、dark.css深色模式+切换逻辑、JwtUtil新增nickname/username存储
+- Sprint 4：E2EE三端集成 — PC端E2eeService(复用server模块DoubleRatchetSession)、Web端e2ee.ts(Web Crypto API ECDH+AES-256-GCM)、Android端DoubleRatchetSession.kt+E2eeManager.kt、client-pc新增server模块依赖
+
+### 影响范围
+- 服务端：HttpApiVerticle、DatabaseService
+- Web客户端：api.ts、websocket.ts、constants.ts、chat.ts、ContactsPage、ChatPage、ProfilePage、e2ee.ts
+- Android客户端：ApiService、ContactsTab、GroupManageScreen、SettingsScreen、NavGraph、Routes、DoubleRatchetSession.kt、E2eeManager.kt
+- PC客户端：FriendService、MessageService、MainController、main.fxml、dark.css、JwtUtil、AuthService、E2eeService、build.gradle.kts
+
+### 功能列表
+- 用户模糊搜索（服务端+三端）
+- 好友搜索添加（三端）
+- 群管理UI（Android群管理页、PC群管理Tab）
+- 消息搜索UI（Web搜索面板、PC搜索Tab）
+- 设置页（Android个人信息/深色模式/关于、PC Settings Tab）
+- 深色模式（PC dark.css + 切换逻辑）
+- E2EE端到端加密集成（PC/Web/Android）
+- 昵称编辑（Web/PC）
+
 ## v0.1.0 - 2026-05-25
 
 ### 变更内容
@@ -249,3 +275,32 @@
 - Nacos 3 节点 Raft 集群
 - 集群部署指南文档
 - 安卓 FCM 推送通知
+
+## v0.4.1-p2 - 2026-05-26
+
+### 变更内容
+- DoubleRatchetSession 5项关键BUG修复：
+  1. DH ratchet密钥对顺序：decrypt()中先用旧dhPair做接收链推导，再生成新dhPair做发送链推导（原代码两次DH输入相同导致输出相同）
+  2. Skipped key查找：decrypt()新增skippedKeys遍历查找，支持乱序消息解密
+  3. AES-GCM参数：IvParameterSpec→GCMParameterSpec（Java 17要求）
+  4. prevChainLength：新增prevChainLength字段（类似Signal pn），跨DH epoch乱序消息支持
+  5. PublicKey比较：equals()→Arrays.equals(encoded)，避免X509编码差异
+- DoubleRatchetSessionTest 11个单元测试全部通过（含跨DH epoch乱序、64KB大包、MAX_SKIP边界等）
+- DoubleRatchetBenchmark 基准测试：
+  - X25519密钥生成: 3229 ops/sec (310µs/op)
+  - X3DH初始化: 230 ops/sec (4.35ms/op)
+  - 加密(256B): 27656 ops/sec (36µs/op)
+  - 解密(256B): 46796 ops/sec (21µs/op)
+  - DH ratchet交替: 612 round-trips/sec
+  - 加密吞吐(64KB): 1169 MB/sec
+- 瓶颈分析：X25519密钥生成(310µs)是DH ratchet步骤的主要瓶颈，X3DH初始化(4.35ms)含5次DH+1次HKDF，单链加密/解密性能充足（>27k ops/sec）
+
+### 影响范围
+- server/e2ee/DoubleRatchetSession.java（核心修复）
+- server/e2ee/DoubleRatchetBenchmark.java（新增）
+- server/test/e2ee/DoubleRatchetSessionTest.java（新增）
+
+### 功能列表
+- E2EE Double Ratchet 完整实现（X3DH + Double Ratchet + AES-256-GCM）
+- 乱序消息解密（同链+跨DH epoch）
+- 基准测试报告

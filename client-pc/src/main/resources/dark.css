@@ -1,0 +1,38 @@
+.root { -fx-base: #1a1a1a; -fx-text-fill: #e0e0e0; }
+
+.session-panel { -fx-background-color: #1e1e1e; }
+.session-header { -fx-background-color: #1e1e1e; -fx-border-color: #2a2a2a; }
+.session-header-title { -fx-text-fill: #e0e0e0; }
+.session-list { -fx-background-color: #1e1e1e; }
+.session-list .list-cell { -fx-background-color: #1e1e1e; -fx-text-fill: #e0e0e0; }
+.session-list .list-cell:hover { -fx-background-color: #2a2a2a; }
+.session-list .list-cell:selected { -fx-background-color: #2a2a2a; }
+
+.chat-panel { -fx-background-color: #111111; }
+.chat-header { -fx-background-color: #1e1e1e; -fx-border-color: #2a2a2a; }
+.chat-target-label { -fx-text-fill: #e0e0e0; }
+.message-list { -fx-background-color: #111111; }
+.message-list .list-cell { -fx-background-color: #111111; }
+
+.input-area { -fx-background-color: #1e1e1e; -fx-border-color: #2a2a2a; }
+.message-input { -fx-background-color: #2a2a2a; -fx-text-fill: #e0e0e0; -fx-border-color: #3a3a3a; }
+
+.settings-panel { -fx-background-color: #1e1e1e; }
+.settings-title { -fx-text-fill: #e0e0e0; -fx-font-size: 16px; -fx-font-weight: bold; }
+
+.tab-pane .tab-header-area .tab-header-background { -fx-background-color: #1e1e1e; }
+.tab-pane .tab { -fx-background-color: #2a2a2a; -fx-text-fill: #aaaaaa; }
+.tab-pane .tab:selected { -fx-background-color: #1e1e1e; -fx-text-fill: #07C160; }
+
+.icon-button { -fx-background-color: #2a2a2a; -fx-text-fill: #e0e0e0; }
+.logout-button { -fx-background-color: transparent; -fx-text-fill: #e0e0e0; }
+.file-upload-button { -fx-background-color: #2a2a2a; -fx-text-fill: #e0e0e0; }
+.send-button { -fx-background-color: #07C160; -fx-text-fill: white; }
+.toolbar-button { -fx-background-color: #2a2a2a; -fx-text-fill: #e0e0e0; }
+.toolbar-button-danger { -fx-background-color: #5a1a1a; -fx-text-fill: #ff6666; }
+
+.search-bar { -fx-padding: 4; }
+.search-bar .text-field { -fx-background-color: #2a2a2a; -fx-text-fill: #e0e0e0; -fx-border-color: #3a3a3a; }
+.search-bar .button { -fx-background-color: #07C160; -fx-text-fill: white; }
+
+.separator .line { -fx-background-color: #2a2a2a; -fx-border-color: #2a2a2a; }

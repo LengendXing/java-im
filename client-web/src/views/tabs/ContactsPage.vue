@@ -63,10 +63,27 @@
     <div v-if="showAddFriend" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div class="bg-[var(--im-surface)] rounded-xl p-6 w-80 shadow-xl">
         <h3 class="text-base font-medium mb-4">{{ $t('contacts.addFriend') }}</h3>
-        <input v-model="targetUserId" type="number" placeholder="User ID" class="im-input mb-3" />
+        <input v-model="addFriendQuery" :placeholder="$t('contacts.searchUser')" class="im-input mb-3" @input="debouncedSearchUsers" />
+        <div v-if="searchingUsers" class="text-xs text-[var(--im-text-secondary)] py-2">{{ $t('common.loading') }}</div>
+        <div v-else-if="userSearchResults.length > 0" class="space-y-1 mb-3 max-h-40 overflow-y-auto">
+          <div v-for="u in userSearchResults" :key="u.userId"
+            class="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-[var(--im-bg-secondary)] cursor-pointer"
+            @click="sendFriendRequest(u.userId)">
+            <div class="w-8 h-8 rounded-lg bg-[var(--im-green)] text-white flex items-center justify-center text-xs font-bold">
+              {{ (u.nickname || u.username || '?').charAt(0).toUpperCase() }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm truncate">{{ u.nickname || u.username }}</p>
+              <p class="text-[10px] text-[var(--im-text-secondary)]">{{ u.username }}</p>
+            </div>
+            <button class="px-2 py-1 text-[10px] bg-[var(--im-green)] text-white rounded hover:bg-[var(--im-green-dark)] transition">
+              {{ $t('contacts.addFriend') }}
+            </button>
+          </div>
+        </div>
+        <div v-else-if="addFriendQuery && !searchingUsers" class="text-xs text-[var(--im-text-secondary)] py-2 mb-3">{{ $t('chat.noResults') }}</div>
         <div class="flex gap-2 justify-end">
-          <button @click="showAddFriend = false" class="px-4 py-2 text-sm rounded-lg hover:bg-[var(--im-bg-secondary)]">{{ $t('common.cancel') }}</button>
-          <button @click="addFriend" class="im-btn-primary text-sm">{{ $t('common.confirm') }}</button>
+          <button @click="showAddFriend = false; addFriendQuery = ''; userSearchResults = []" class="px-4 py-2 text-sm rounded-lg hover:bg-[var(--im-bg-secondary)]">{{ $t('common.cancel') }}</button>
         </div>
       </div>
     </div>
@@ -95,14 +112,17 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { getFriendList, applyFriend, getFriendRequests, acceptFriend, rejectFriend, createGroup as apiCreateGroup } from '../../services/api'
+import { getFriendList, applyFriend, getFriendRequests, acceptFriend, rejectFriend, searchUsers, createGroup as apiCreateGroup } from '../../services/api'
 
 const search = ref('')
 const friends = ref<Array<{ userId: number; username: string; nickname: string }>>([])
 const showAddFriend = ref(false)
 const showCreateGroupDialog = ref(false)
 const showFriendRequests = ref(false)
-const targetUserId = ref('')
+const addFriendQuery = ref('')
+const userSearchResults = ref<Array<{ userId: number; username: string; nickname: string; avatarUrl: string }>>([])
+const searchingUsers = ref(false)
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 // Friend requests
 const pendingRequests = ref<Array<{ fromUserId: number; username: string; nickname: string; message: string }>>([])
@@ -138,7 +158,31 @@ async function loadFriendRequests() {
   } catch { /* ignore */ }
 }
 
-async function addFriend() {
+function debouncedSearchUsers() {
+  if (searchTimer) clearTimeout(searchTimer)
+  const q = addFriendQuery.value.trim()
+  if (!q) { userSearchResults.value = []; return }
+  searchTimer = setTimeout(async () => {
+    searchingUsers.value = true
+    try {
+      const res = await searchUsers(q)
+      if (res.code === 0) userSearchResults.value = res.data || []
+    } catch { /* ignore */ }
+    finally { searchingUsers.value = false }
+  }, 300)
+}
+
+async function sendFriendRequest(targetUserId: number) {
+  try {
+    await applyFriend(targetUserId)
+    showAddFriend.value = false
+    addFriendQuery.value = ''
+    userSearchResults.value = []
+    await loadFriends()
+  } catch { /* ignore */ }
+}
+
+async function addFriendLegacy() {
   const id = Number(targetUserId.value)
   if (id <= 0) return
   try {

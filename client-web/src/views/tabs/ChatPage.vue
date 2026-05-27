@@ -6,9 +6,29 @@
       <div class="p-2">
         <div class="relative">
           <input v-model="search" :placeholder="$t('chat.search')"
+            @focus="showSearchPanel = true"
             class="im-input bg-[var(--im-bg-secondary)] pl-8" />
           <span class="absolute left-2.5 top-2.5 text-[var(--im-text-secondary)] text-xs">🔍</span>
         </div>
+      </div>
+      <!-- Search results panel -->
+      <div v-if="showSearchPanel && search.trim()" class="border-b border-[var(--im-border)] bg-[var(--im-bg-secondary)] max-h-[200px] overflow-y-auto">
+        <div class="px-3 py-1.5 text-[10px] text-[var(--im-text-secondary)] font-medium">{{ $t('chat.searchMessages') }}</div>
+        <div v-if="chat.isSearching" class="px-3 py-2 text-xs text-[var(--im-text-secondary)]">{{ $t('common.loading') }}</div>
+        <template v-else>
+          <div v-for="msg in chat.searchResults" :key="msg.msgId"
+            @click="jumpToMessage(msg)"
+            class="flex items-center gap-2 px-4 py-2 cursor-pointer hover:bg-[var(--im-surface)]">
+            <div class="w-6 h-6 rounded bg-[var(--im-green)] text-white flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+              {{ String(msg.senderId).charAt(0) }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs truncate">{{ msg.content?.text || '[Media]' }}</p>
+              <p class="text-[9px] text-[var(--im-text-secondary)]">{{ msg.sessionId }}</p>
+            </div>
+          </div>
+          <div v-if="chat.searchResults.length === 0" class="px-3 py-2 text-xs text-[var(--im-text-secondary)]">{{ $t('chat.noResults') }}</div>
+        </template>
       </div>
       <!-- Session list -->
       <div class="flex-1 overflow-y-auto">
@@ -110,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import { useAuthStore } from '../../stores/auth'
 import { getFriendList, getGroupMembers, kickGroupMember, dissolveGroup, inviteToGroup } from '../../services/api'
@@ -122,6 +142,7 @@ import MessageInput from '../../components/chat/MessageInput.vue'
 const chat = useChatStore()
 const auth = useAuthStore()
 const search = ref('')
+const showSearchPanel = ref(false)
 
 // Group info panel state
 const groupInfoVisible = ref(false)
@@ -136,6 +157,20 @@ const filteredSessions = computed(() => {
   const q = search.value.toLowerCase()
   return chat.sessions.filter(s => (s.name || '').toLowerCase().includes(q))
 })
+
+let searchMsgTimer: ReturnType<typeof setTimeout> | null = null
+watch(search, (val) => {
+  if (searchMsgTimer) clearTimeout(searchMsgTimer)
+  const q = val.trim()
+  if (!q) { chat.clearSearch(); showSearchPanel.value = false; return }
+  showSearchPanel.value = true
+  searchMsgTimer = setTimeout(() => chat.searchMessages(q), 300)
+})
+
+function jumpToMessage(msg: { sessionId: string }) {
+  showSearchPanel.value = false
+  chat.selectSession(msg.sessionId)
+}
 
 function openChat(session: SessionInfo) {
   chat.selectSession(session.sessionId)

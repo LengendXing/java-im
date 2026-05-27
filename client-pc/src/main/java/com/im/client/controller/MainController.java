@@ -31,6 +31,8 @@ public class MainController implements Initializable {
 
     @FXML private ListView<SessionModel> sessionListView;
     @FXML private ListView<FriendService.FriendRequest> friendRequestListView;
+    @FXML private ListView<FriendService.FriendItem> friendListView;
+    @FXML private ListView<MessageService.SearchResult> msgSearchResultListView;
     @FXML private Label chatTargetLabel;
     @FXML private ListView<MessageModel> messageListView;
     @FXML private TextArea messageInput;
@@ -39,6 +41,11 @@ public class MainController implements Initializable {
     @FXML private Button groupInviteButton;
     @FXML private Button groupKickButton;
     @FXML private Button groupDissolveButton;
+    @FXML private TextField friendSearchField;
+    @FXML private TextField msgSearchField;
+    @FXML private Label profileNickname;
+    @FXML private Label profileUsername;
+    @FXML private CheckBox darkModeCheckBox;
 
     private SessionModel currentSession;
 
@@ -46,8 +53,16 @@ public class MainController implements Initializable {
     public void initialize(URL location, ResourceBundle resources) {
         setupSessionList();
         setupFriendRequestList();
+        setupFriendList();
         setupMessageList();
+        setupMsgSearchList();
         setupInput();
+
+        // Profile info
+        String nickname = JwtUtil.getNickname();
+        String username = JwtUtil.getUsername();
+        if (nickname != null) profileNickname.setText(nickname);
+        if (username != null) profileUsername.setText("@" + username);
 
         SessionService.getInstance().getSessions().addListener(
                 (javafx.collections.ListChangeListener<SessionModel>) change -> {
@@ -73,6 +88,15 @@ public class MainController implements Initializable {
     private void setupFriendRequestList() {
         friendRequestListView.setItems(FriendService.getInstance().getPendingRequests());
         friendRequestListView.setCellFactory(list -> new FriendRequestCell());
+    }
+
+    private void setupFriendList() {
+        friendListView.setItems(FriendService.getInstance().getFriendList());
+        friendListView.setCellFactory(list -> new FriendItemCell());
+    }
+
+    private void setupMsgSearchList() {
+        msgSearchResultListView.setCellFactory(list -> new MsgSearchResultCell());
     }
 
     private void setupMessageList() {
@@ -213,6 +237,71 @@ public class MainController implements Initializable {
     @FXML
     private void onFriendRequestsTabChanged() {
         FriendService.getInstance().loadPendingRequests();
+    }
+
+    @FXML
+    private void onFriendsTabChanged() {
+        FriendService.getInstance().loadFriendList();
+    }
+
+    @FXML
+    private void onSearchTabChanged() {
+        // Focus search field
+    }
+
+    @FXML
+    private void onSearchUsers() {
+        String keyword = friendSearchField.getText().trim();
+        if (keyword.isEmpty()) return;
+        new Thread(() -> {
+            var results = FriendService.getInstance().searchUsers(keyword);
+            Platform.runLater(() -> {
+                friendListView.setItems(results);
+            });
+        }).start();
+    }
+
+    @FXML
+    private void onAddFriend() {
+        String keyword = friendSearchField.getText().trim();
+        if (keyword.isEmpty()) return;
+        TextInputDialog dialog = new TextInputDialog(keyword);
+        dialog.setTitle("Add Friend");
+        dialog.setHeaderText("Enter user ID to send friend request:");
+        dialog.setContentText("User ID:");
+        Optional<String> result = dialog.showAndWait();
+        if (result.isEmpty()) return;
+        try {
+            long targetUserId = Long.parseLong(result.get().trim());
+            new Thread(() -> {
+                boolean ok = FriendService.getInstance().applyFriend(targetUserId);
+                Platform.runLater(() -> {
+                    if (ok) showAlert("Sent", "Friend request sent.");
+                    else showAlert("Failed", "Could not send friend request.");
+                });
+            }).start();
+        } catch (NumberFormatException e) {
+            showAlert("Invalid", "Please enter a valid user ID.");
+        }
+    }
+
+    @FXML
+    private void onSearchMessages() {
+        String keyword = msgSearchField.getText().trim();
+        if (keyword.isEmpty()) return;
+        new Thread(() -> {
+            var results = MessageService.getInstance().searchMessages(keyword);
+            Platform.runLater(() -> msgSearchResultListView.setItems(results));
+        }).start();
+    }
+
+    @FXML
+    private void onToggleDarkMode() {
+        boolean dark = darkModeCheckBox.isSelected();
+        var styles = messageInput.getScene().getStylesheets();
+        String darkCss = getClass().getResource("/dark.css").toExternalForm();
+        if (dark) styles.add(darkCss);
+        else styles.removeIf(s -> s.contains("dark.css"));
     }
 
     // ===== Group Management =====
@@ -629,6 +718,30 @@ public class MainController implements Initializable {
                     Platform.runLater(() -> showAlert("Recall Failed", "Could not recall message. It may be older than 2 minutes."));
                 }
             }).start();
+        }
+    }
+
+    // ===== Friend Item Cell =====
+
+    private static class FriendItemCell extends ListCell<FriendService.FriendItem> {
+        @Override
+        protected void updateItem(FriendService.FriendItem friend, boolean empty) {
+            super.updateItem(friend, empty);
+            if (empty || friend == null) { setGraphic(null); setText(null); return; }
+            String name = friend.getNickname() != null && !friend.getNickname().isEmpty()
+                    ? friend.getNickname() : friend.getUsername();
+            setText(name + " (" + friend.getUserId() + ")");
+        }
+    }
+
+    // ===== Message Search Result Cell =====
+
+    private static class MsgSearchResultCell extends ListCell<MessageService.SearchResult> {
+        @Override
+        protected void updateItem(MessageService.SearchResult result, boolean empty) {
+            super.updateItem(result, empty);
+            if (empty || result == null) { setGraphic(null); setText(null); return; }
+            setText(result.getContent() + " [" + result.getSessionId() + "]");
         }
     }
 

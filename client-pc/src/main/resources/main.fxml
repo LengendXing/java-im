@@ -27,6 +27,36 @@
                 <Tab text="Requests" onSelectionChanged="#onFriendRequestsTabChanged">
                     <ListView fx:id="friendRequestListView" styleClass="session-list" VBox.vgrow="ALWAYS"/>
                 </Tab>
+                <Tab text="Friends" onSelectionChanged="#onFriendsTabChanged">
+                    <VBox spacing="4">
+                        <HBox spacing="4" alignment="CENTER_LEFT" styleClass="search-bar">
+                            <TextField fx:id="friendSearchField" promptText="Search users..." HBox.hgrow="ALWAYS"/>
+                            <Button text="Search" onAction="#onSearchUsers"/>
+                            <Button text="Add" onAction="#onAddFriend"/>
+                        </HBox>
+                        <ListView fx:id="friendListView" styleClass="session-list" VBox.vgrow="ALWAYS"/>
+                    </VBox>
+                </Tab>
+                <Tab text="Search" onSelectionChanged="#onSearchTabChanged">
+                    <VBox spacing="4">
+                        <HBox spacing="4" alignment="CENTER_LEFT" styleClass="search-bar">
+                            <TextField fx:id="msgSearchField" promptText="Search messages..." HBox.hgrow="ALWAYS"/>
+                            <Button text="Search" onAction="#onSearchMessages"/>
+                        </HBox>
+                        <ListView fx:id="msgSearchResultListView" styleClass="session-list" VBox.vgrow="ALWAYS"/>
+                    </VBox>
+                </Tab>
+                <Tab text="Settings">
+                    <VBox spacing="8" styleClass="settings-panel">
+                        <padding><Insets top="16" right="16" bottom="16" left="16"/></padding>
+                        <Label fx:id="profileNickname" styleClass="settings-title"/>
+                        <Label fx:id="profileUsername" style="-fx-text-fill: #999999;"/>
+                        <Separator/>
+                        <CheckBox fx:id="darkModeCheckBox" text="Dark Mode" onAction="#onToggleDarkMode"/>
+                        <Separator/>
+                        <Label text="java-im v0.5.0" style="-fx-text-fill: #999999;"/>
+                    </VBox>
+                </Tab>
             </TabPane>
         </VBox>
     </left>

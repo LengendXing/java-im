@@ -348,6 +348,27 @@ public class DatabaseService {
         return queryMessagesFromTables(tables, whereClause, params, "ORDER BY server_time DESC LIMIT ?", Tuple.of(limit));
     }
 
+    public Future<List<User>> searchUsers(String keyword, int limit) {
+        Promise<List<User>> promise = Promise.promise();
+        String pattern = "%" + keyword + "%";
+        pool.preparedQuery("SELECT user_id, username, nickname, avatar_url FROM im_users WHERE username LIKE ? OR nickname LIKE ? LIMIT ?")
+                .execute(Tuple.of(pattern, pattern, limit))
+                .onSuccess(rows -> {
+                    List<User> users = new ArrayList<>();
+                    for (Row row : rows) {
+                        User u = new User();
+                        u.setUserId(row.getLong(0));
+                        u.setUsername(row.getString(1));
+                        u.setNickname(row.getString(2));
+                        u.setAvatarUrl(row.getString(3));
+                        users.add(u);
+                    }
+                    promise.complete(users);
+                })
+                .onFailure(promise::fail);
+        return promise.future();
+    }
+
     public Future<List<User>> getFriendList(long userId, int limit) {
         Promise<List<User>> promise = Promise.promise();
         pool.preparedQuery("SELECT u.user_id, u.username, u.nickname, u.avatar_url FROM im_friend f JOIN im_users u ON f.friend_id = u.user_id WHERE f.user_id = ? ORDER BY f.created_at DESC LIMIT ?")

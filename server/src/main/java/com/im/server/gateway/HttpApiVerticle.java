@@ -4,6 +4,7 @@ import com.im.server.common.RedisServiceHolder;
 import com.im.server.common.ServerConfig;
 import com.im.server.e2ee.E2eeKeyServiceHolder;
 import com.im.server.common.DatabaseServiceHolder;
+import com.im.server.storage.User;
 import com.im.server.storage.RedisService;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.http.HttpMethod;
@@ -105,6 +106,29 @@ public class HttpApiVerticle extends AbstractVerticle {
             JsonObject body = ctx.body().asJsonObject();
             if (body == null) { ctx.response().setStatusCode(400).end("{\"code\":1003,\"msg\":\"invalid body\"}"); return; }
             vertx.eventBus().<JsonObject>request("im.logic.LOGIN", body, reply -> handleReply(ctx, reply));
+        });
+
+        // GET /api/user/search?q=xxx
+        router.get("/api/user/search").handler(ctx -> {
+            String q = ctx.request().getParam("q", "");
+            if (q.trim().isEmpty()) {
+                ctx.json(new JsonObject().put("code", 0).put("msg", "ok").put("data", new JsonArray()));
+                return;
+            }
+            int limit = Integer.parseInt(ctx.request().getParam("limit", "20"));
+            DatabaseServiceHolder.getInstance().searchUsers(q.trim(), limit)
+                    .onSuccess(users -> {
+                        JsonArray arr = new JsonArray();
+                        for (var u : users) {
+                            arr.add(new JsonObject()
+                                    .put("userId", u.getUserId())
+                                    .put("username", u.getUsername())
+                                    .put("nickname", u.getNickname())
+                                    .put("avatarUrl", u.getAvatarUrl()));
+                        }
+                        ctx.json(new JsonObject().put("code", 0).put("msg", "ok").put("data", arr));
+                    })
+                    .onFailure(err -> ctx.json(new JsonObject().put("code", 1).put("msg", "search failed")));
         });
 
         // GET /api/user/{id}

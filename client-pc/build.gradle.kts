@@ -19,6 +19,7 @@ javafx {
 
 dependencies {
     implementation(project(":protocol"))
+    implementation(project(":server"))
     implementation("com.google.protobuf:protobuf-java:3.25.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.10.1")

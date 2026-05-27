@@ -46,6 +46,11 @@ export async function applyFriend(targetUserId: number, message = '') {
   return res.data
 }
 
+export async function searchUsers(q: string, limit = 20) {
+  const res = await api.get('/user/search', { params: { q, limit } })
+  return res.data
+}
+
 export async function getGroupMembers(groupId: number) {
   const res = await api.get(`/group/${groupId}/members`)
   return res.data

@@ -46,8 +46,11 @@ public class AuthService {
                 JsonObject resp = gson.fromJson(respStr, JsonObject.class);
                 int code = resp.has("code") ? resp.get("code").getAsInt() : -1;
                 if (code == 0 && resp.has("data")) {
-                    String token = resp.getAsJsonObject("data").get("token").getAsString();
+                    JsonObject data = resp.getAsJsonObject("data");
+                    String token = data.get("token").getAsString();
                     JwtUtil.setToken(token);
+                    if (data.has("username")) JwtUtil.setUsername(data.get("username").getAsString());
+                    if (data.has("nickname")) JwtUtil.setNickname(data.get("nickname").getAsString());
                     return new AuthResult(true, "OK", token);
                 }
                 String msg = resp.has("message") ? resp.get("message").getAsString() : "Login failed";

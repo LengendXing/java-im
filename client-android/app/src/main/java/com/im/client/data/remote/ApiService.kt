@@ -92,6 +92,11 @@ class ApiService private constructor() {
         @SerializedName("from_user_id") val fromUserId: Long
     )
 
+    data class FriendApplyRequest(
+        @SerializedName("target_user_id") val targetUserId: Long,
+        val message: String = ""
+    )
+
     data class GroupCreateRequest(
         val name: String,
         @SerializedName("member_ids") val memberIds: List<Long>
@@ -99,7 +104,7 @@ class ApiService private constructor() {
 
     data class GroupInviteRequest(
         @SerializedName("group_id") val groupId: Long,
-        @SerializedName("user_id") val userId: Long
+        @SerializedName("user_ids") val userIds: List<Long>
     )
 
     data class GroupKickRequest(
@@ -142,7 +147,22 @@ class ApiService private constructor() {
     data class FriendListResponse(
         @SerializedName("user_id") val userId: Long,
         val nickname: String,
+        val username: String = "",
         @SerializedName("avatar_url") val avatarUrl: String
+    )
+
+    data class UserSearchResult(
+        @SerializedName("user_id") val userId: Long,
+        val username: String,
+        val nickname: String,
+        @SerializedName("avatar_url") val avatarUrl: String = ""
+    )
+
+    data class GroupMemberResponse(
+        @SerializedName("user_id") val userId: Long,
+        val username: String = "",
+        val nickname: String = "",
+        val role: Int = 0
     )
 
     // --- Original API methods ---
@@ -210,6 +230,18 @@ class ApiService private constructor() {
             checkApiSuccess(executeRaw(request))
         }
 
+    suspend fun applyFriend(token: String, targetUserId: Long, message: String = "") =
+        withContext(Dispatchers.IO) {
+            val body = gson.toJson(FriendApplyRequest(targetUserId, message))
+                .toRequestBody(jsonType)
+            val request = Request.Builder()
+                .url("$baseUrl/api/friend/apply")
+                .addHeader("Authorization", "Bearer $token")
+                .post(body)
+                .build()
+            checkApiSuccess(executeRaw(request))
+        }
+
     suspend fun rejectFriend(token: String, fromUserId: Long) =
         withContext(Dispatchers.IO) {
             val body = gson.toJson(FriendActionRequest(fromUserId))
@@ -244,9 +276,9 @@ class ApiService private constructor() {
             parseApiData(executeRaw(request), GroupInfoResponse::class.java)
         }
 
-    suspend fun inviteToGroup(token: String, groupId: Long, userId: Long) =
+    suspend fun inviteToGroup(token: String, groupId: Long, userIds: List<Long>) =
         withContext(Dispatchers.IO) {
-            val body = gson.toJson(GroupInviteRequest(groupId, userId))
+            val body = gson.toJson(GroupInviteRequest(groupId, userIds))
                 .toRequestBody(jsonType)
             val request = Request.Builder()
                 .url("$baseUrl/api/group/invite")
@@ -312,6 +344,26 @@ class ApiService private constructor() {
                 .get()
                 .build()
             parseApiDataList(executeRaw(request), MessageSearchResult::class.java)
+        }
+
+    suspend fun searchUsers(token: String, query: String, limit: Int = 20): List<UserSearchResult> =
+        withContext(Dispatchers.IO) {
+            val request = Request.Builder()
+                .url("$baseUrl/api/user/search?q=${java.net.URLEncoder.encode(query, "UTF-8")}&limit=$limit")
+                .addHeader("Authorization", "Bearer $token")
+                .get()
+                .build()
+            parseApiDataList(executeRaw(request), UserSearchResult::class.java)
+        }
+
+    suspend fun getGroupMembers(token: String, groupId: Long): List<GroupMemberResponse> =
+        withContext(Dispatchers.IO) {
+            val request = Request.Builder()
+                .url("$baseUrl/api/group/$groupId/members")
+                .addHeader("Authorization", "Bearer $token")
+                .get()
+                .build()
+            parseApiDataList(executeRaw(request), GroupMemberResponse::class.java)
         }
 
     // --- Internal helpers ---
