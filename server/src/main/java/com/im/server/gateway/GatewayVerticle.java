@@ -180,15 +180,25 @@ public class GatewayVerticle extends AbstractVerticle {
                     if (reply.succeeded() && reply.result().body() != null) {
                         ImProto.AuthResponse resp = ImProto.AuthResponse.parseFrom(reply.result().body());
                         if (resp.getCode() == 0) {
-                            conn.setAuthInfo(resp.getUserInfo().getUserId(), req.getDeviceId(), req.getPlatform());
+                            long userId = resp.getUserInfo().getUserId();
+                            // Kick existing connection for same user (single-device)
+                            Connection existing = connManager.getByUserId(userId);
+                            if (existing != null && existing != conn) {
+                                log.info("kicking existing connection {} for user {}", existing.getConnectionId(), userId);
+                                existing.close();
+                                connManager.remove(existing);
+                                pendingBuffers.remove(existing.getConnectionId());
+                                heartbeatTimes.remove(existing.getConnectionId());
+                            }
+                            conn.setAuthInfo(userId, req.getDeviceId(), req.getPlatform());
                             connManager.registerUser(conn);
                             heartbeatTimes.put(conn.getConnectionId(), System.currentTimeMillis());
 
                             // Register route in Redis pointing to this gateway
-                            RedisServiceHolder.getInstance().setUserOnline(resp.getUserInfo().getUserId(), gatewayId, 3600)
+                            RedisServiceHolder.getInstance().setUserOnline(userId, gatewayId, 3600)
                                     .onFailure(err -> log.warn("route set failed: {}", err.getMessage()));
 
-                            log.info("user {} authenticated on {}", conn.getUserId(), conn.getConnectionId());
+                            log.info("user {} authenticated on {}", userId, conn.getConnectionId());
                         }
                         sendToConnection(conn, new ImPacket(Cmd.AUTH_ACK, MsgType.RESPONSE, packet.getSequenceId(), resp));
                     } else {
@@ -280,7 +290,9 @@ public class GatewayVerticle extends AbstractVerticle {
     private void sendToConnection(Connection conn, ImPacket packet) {
         try {
             conn.write(packet.encode());
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            log.warn("send to connection {} failed: {}", conn.getConnectionId(), e.getMessage());
+        }
     }
 
     private void handleDisconnect(Connection conn) {

@@ -1,0 +1,211 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass ${IM_REDIS_PASSWORD:-im_redis_pass}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${IM_REDIS_PASSWORD:-im_redis_pass}", "ping"]
+      interval: 5s
+      retries: 5
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${IM_MYSQL_PASSWORD:-im_root_pass}
+      MYSQL_DATABASE: im_db
+      MYSQL_USER: im_user
+      MYSQL_PASSWORD: ${IM_MYSQL_PASSWORD:-im_root_pass}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  dufs:
+    image: sigoden/dufs:latest
+    ports:
+      - "${IM_DUF_PORT:-5100}:5100"
+    volumes:
+      - uploads_data:/app/uploads
+    command: /app/uploads --port 5100 --allow-upload --allow-delete --allow-search
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5100/"]
+      interval: 5s
+      retries: 5
+    restart: unless-stopped
+
+  folkmq:
+    image: noearorg/folkmq-broker:1.7.13
+    ports:
+      - "18602:18602"
+      - "8602:8602"
+    environment:
+      FOLKMQ_BROKER_PORT: 18602
+      FOLKMQ_BROKER_ADMIN_PORT: 8602
+    volumes:
+      - folkmq_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8602/"]
+      interval: 5s
+      retries: 5
+    restart: unless-stopped
+
+  rnacos-node1:
+    image: qingpan/rnacos:stable
+    ports:
+      - "8848:8848"
+      - "10848:10848"
+    environment:
+      RNACOS_RUN_MODE: cluster
+      RNACOS_CONFIG_DB_DIR: /data/nacos_db
+      RNACOS_RAFT_NODE_ID: 1
+      RNACOS_RAFT_ADDR: rnacos-node1:9301
+      RNACOS_RAFT_CLUSTER_NODE_IDS: 1,2,3
+      RNACOS_RAFT_CLUSTER_NODE_ADDRS: rnacos-node1:9301,rnacos-node2:9301,rnacos-node3:9301
+    volumes:
+      - rnacos_data1:/data
+    restart: unless-stopped
+
+  rnacos-node2:
+    image: qingpan/rnacos:stable
+    ports:
+      - "8849:8848"
+      - "10849:10848"
+    environment:
+      RNACOS_RUN_MODE: cluster
+      RNACOS_CONFIG_DB_DIR: /data/nacos_db
+      RNACOS_RAFT_NODE_ID: 2
+      RNACOS_RAFT_ADDR: rnacos-node2:9301
+      RNACOS_RAFT_CLUSTER_NODE_IDS: 1,2,3
+      RNACOS_RAFT_CLUSTER_NODE_ADDRS: rnacos-node1:9301,rnacos-node2:9301,rnacos-node3:9301
+    volumes:
+      - rnacos_data2:/data
+    restart: unless-stopped
+
+  rnacos-node3:
+    image: qingpan/rnacos:stable
+    ports:
+      - "8850:8848"
+      - "10850:10848"
+    environment:
+      RNACOS_RUN_MODE: cluster
+      RNACOS_CONFIG_DB_DIR: /data/nacos_db
+      RNACOS_RAFT_NODE_ID: 3
+      RNACOS_RAFT_ADDR: rnacos-node3:9301
+      RNACOS_RAFT_CLUSTER_NODE_IDS: 1,2,3
+      RNACOS_RAFT_CLUSTER_NODE_ADDRS: rnacos-node1:9301,rnacos-node2:9301,rnacos-node3:9301
+    volumes:
+      - rnacos_data3:/data
+    restart: unless-stopped
+
+  im-server:
+    build: .
+    ports:
+      - "${IM_TCP_PORT:-8800}:8800"
+      - "${IM_WS_PORT:-8801}:8801"
+      - "${IM_HTTP_PORT:-8080}:8080"
+    environment:
+      IM_TCP_PORT: 8800
+      IM_WS_PORT: 8801
+      IM_HTTP_PORT: 8080
+      IM_REDIS_HOST: redis
+      IM_REDIS_PASSWORD: ${IM_REDIS_PASSWORD:-im_redis_pass}
+      IM_MYSQL_HOST: mysql
+      IM_MYSQL_PORT: 3306
+      IM_MYSQL_DB: im_db
+      IM_MYSQL_USER: root
+      IM_MYSQL_PASSWORD: ${IM_MYSQL_PASSWORD:-im_root_pass}
+      IM_JWT_SECRET: ${IM_JWT_SECRET:?IM_JWT_SECRET must be set}
+      IM_DUF_URL: http://dufs:5100
+      IM_CLUSTER_ENABLED: "true"
+      IM_FOLKMQ_HOST: folkmq
+      IM_FOLKMQ_PORT: 18602
+      IM_NACOS_ENABLED: "true"
+      IM_NACOS_SERVER_ADDR: "rnacos-node1:8848,rnacos-node2:8848,rnacos-node3:8848"
+    depends_on:
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      folkmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/health"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+
+  client-web:
+    build: ./client-web
+    ports:
+      - "${IM_WEB_PORT:-80}:80"
+    depends_on:
+      im-server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - prometheus_data:/prometheus
+    depends_on:
+      - im-server
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${IM_GRAFANA_PASSWORD:-admin}
+    volumes:
+      - ./monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/java-im.json
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    volumes:
+      - ./monitoring/promtail.yml:/etc/promtail/config.yml
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  mysql_data:
+  uploads_data:
+  folkmq_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  rnacos_data1:
+  rnacos_data2:
+  rnacos_data3:

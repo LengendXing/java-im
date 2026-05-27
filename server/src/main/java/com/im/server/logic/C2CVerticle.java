@@ -112,7 +112,7 @@ public class C2CVerticle extends AbstractVerticle {
                     .onFailure(err -> {
                         log.error("C2C msg error: {}", err.getMessage());
                         ImProto.C2CMsgResponse ack = ImProto.C2CMsgResponse.newBuilder()
-                                .setCode(1).setMsg("send failed: " + err.getMessage()).build();
+                                .setCode(1).setMsg("send failed").build();
                         msg.reply(ack.toByteArray());
                     });
 
